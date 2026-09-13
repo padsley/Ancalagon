@@ -456,9 +456,7 @@ own `G4AnalysisManager` (`G4RootAnalysisManager` backend, chosen by the
 `.root` extension), which writes genuine ROOT-format `TTree`s using
 Geant4's embedded writer, with **no dependency on an external ROOT
 install** to produce the file (only to read it back, e.g. with a plain
-`root` session -- this machine also happens to have one, at
-`/home/padsley/codes/root_build/bin/root`, used to verify the schema/
-contents below).
+`root` session -- one was used to verify the schema/contents below).
 
 Two trees, `Bgo` and `Dsssd` (`HitNtuple.hh` is the single place their
 column layout is defined -- `RunAction.cc` creates columns in that exact
@@ -692,11 +690,10 @@ transportation-only configuration this pilot launched with.
 
 ## Build & run
 
-Requires the Geant4 install already on this machine
-(`/home/padsley/codes/geant4_install`, v11.3.0), built with its `analysis`
-category (`libG4analysis.so`) -- no separate ROOT install is needed to
-*build* or *run* this (see "ROOT output" above), only to read
-`dragon_hits.root` back afterwards.
+Requires a Geant4 install (v11.3.0 used throughout this README) built
+with its `analysis` category (`libG4analysis.so`) -- no separate ROOT
+install is needed to *build* or *run* this (see "ROOT output" above),
+only to read `dragon_hits.root` back afterwards.
 
 This repo doesn't vendor the original GEANT3 Fortran (`G3_DRAGON`, this
 port's own source of truth throughout -- see every "Validation" section
@@ -710,7 +707,7 @@ from `G3_DRAGON` at all.
 
 ```sh
 mkdir -p build && cd build
-cmake -DGeant4_DIR=/home/padsley/codes/geant4_install/lib/cmake/Geant4 ..
+cmake -DGeant4_DIR=/path/to/geant4-install/lib/cmake/Geant4 ..  # omit -DGeant4_DIR if Geant4 is already on your CMAKE_PREFIX_PATH
 make -j$(nproc)
 
 # Field validation (each writes/reads its own CSV pair; compare_fields.py
