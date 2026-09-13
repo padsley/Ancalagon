@@ -1,0 +1,22 @@
+# Build directory
+build/
+build*/
+
+# Field-validation Fortran probe binaries and their CSV output (see
+# README.md's "Build & run" -- compiled from validate/*.f against the
+# sibling G3_DRAGON checkout, and regenerable at any time)
+validate/mitray_poles_probe
+validate/mitray_poles_probe_q2
+validate/mitray_poles_probe_rest
+validate/mitray_dipole_probe
+validate/mitray_dipole_probe_d2
+validate/mitray_edipol_probe
+validate/mitray_edipol_probe_e2
+# *_fortran_reference.csv are checked-in reference data (the real
+# Fortran's own output); *_cpp_reference.csv is the C++ side's generated
+# output (normally written to build/, not here) -- only the latter is
+# ignored.
+validate/*_cpp_reference.csv
+
+# Analysis output (see README.md's "ROOT output")
+*.root

@@ -1,0 +1,7 @@
+# Standard Geant4 visualization bootstrap (same pattern as the Geant4
+# example suite's init_vis.mac): picks whatever viewer driver is actually
+# available at runtime (Qt if built with it and a display is present,
+# otherwise OGL/X11, etc.) rather than hardcoding one.
+/vis/open
+
+/control/execute vis.mac

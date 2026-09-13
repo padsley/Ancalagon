@@ -1,0 +1,4 @@
+# Fire a handful of design-orbit 19Ne4+ ions through the full chain and
+# leave their trajectories on screen (see init_vis.mac's
+# endOfEventAction accumulate).
+/run/beamOn 5

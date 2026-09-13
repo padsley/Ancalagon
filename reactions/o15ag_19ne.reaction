@@ -1,0 +1,64 @@
+COMM ---------------------------------------------------------------------
+COMM 15O(alpha,gamma)19Ne radiative capture: 15O beam on an at-rest alpha
+COMM (He gas target). This is dragon_2014_DSSSD.dat/dragon_2003.ffcards's
+COMM own reaction -- see README.md's "Reaction specification" for the
+COMM full derivation and cross-checks against those files' own numbers.
+COMM Loaded by ReactionConfig::Load() (see include/ReactionConfig.hh for
+COMM the card format); consumed by ReactionKinematics (generic, not
+COMM specific to this reaction) via PrimaryGeneratorAction's reaction-file
+COMM constructor. Format modeled on this project's own dragon_2003.ffcards.
+COMM ---------------------------------------------------------------------
+COMM
+COMM Ground-state masses, AME mass-excess convention (mass = A*amu +
+COMM massExcessMeV, amu=931.49432 MeV/c^2) -- src/ureact.f case(2)'s own
+COMM devmass values for BEAM/RECL; TARG's massExcessMeV (2.42492 MeV, the
+COMM real AME value for 4He) reproduces src/ureact.f's own literal
+COMM hemass constant (4.002603250*amu) to 7 eV, so this file uses the
+COMM same mass-excess convention for every particle rather than mixing
+COMM conventions.
+COMM
+BEAM 8   15   2.8554
+TARG 2   4    2.42492
+RECL 10  19   1.7511   4
+COMM
+COMM Resonance energy: CM energy above the 15O+alpha threshold at which
+COMM the compound state (Ex=4.03 MeV in 19Ne, the astrophysical
+COMM breakout resonance) forms. src/ureact.f case(2)'s own hardcoded
+COMM value -- cross-validated in README.md against every independent
+COMM number this repo's data files give for this configuration.
+COMM
+ERES 0.5036
+COMM
+COMM Bound excited states of 19Ne below the resonance that this cascade
+COMM can pass through on its way to the ground state. Level numbers are
+COMM this file's own labels (arbitrary positive integers, need not be in
+COMM energy order) -- src/ureact.f's own idpart numbers for the same
+COMM three states were 82, 83, 84; renumbered here to 1, 2, 3 rather than
+COMM carried over literally (idpart is a GEANT3 tracking-medium/particle-
+COMM table implementation detail, not a property of the physics).
+COMM
+COMM level  excitation(MeV)  lifetime(s)
+LEVL   1     1.536             2.8E-11
+LEVL   2     0.275             6.3E-11
+LEVL   3     0.238             2.6E-8
+COMM
+COMM Branching ratios (src/ureact.f case(2)'s own gsdk brat/mode arrays):
+COMM the resonance (-1) decays 80% direct to ground (this is the
+COMM dominant branch this pilot's own two-body-only generator used to be
+COMM limited to before cascade support existed), 15% to level 2 (0.275
+COMM MeV), 5% to level 1 (1.536 MeV); level 1 then decays 95% to level 3
+COMM (0.238 MeV) and 5% to level 2; levels 2 and 3 both decay 100% direct
+COMM to ground. Percentages are renormalized per fromLevel by
+COMM ReactionKinematics, so they don't strictly need to sum to 100 (they
+COMM do here, matching the source exactly).
+COMM
+COMM fromLevel  percent  toLevel
+BRAT   -1         80.0     0
+BRAT   -1         15.0     2
+BRAT   -1          5.0     1
+BRAT    1         95.0     3
+BRAT    1          5.0     2
+BRAT    2        100.0     0
+BRAT    3        100.0     0
+COMM
+SENT
