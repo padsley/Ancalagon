@@ -19,6 +19,27 @@ class ReactionKinematics {
   // to be populated -- MeV, total (not per nucleon).
   double BeamKineticEnergyMeV() const;
 
+  // Same, but for an arbitrary CM energy above threshold rather than the
+  // config's own resonanceEnergyMeV -- BeamKineticEnergyMeV() is just this
+  // called with fConfig.resonanceEnergyMeV. Public because
+  // PrimaryGeneratorAction's depth-sampling (see GasStoppingPower) needs
+  // to convert a beam kinetic energy at a given depth back into an
+  // equivalent CM energy, to know how far it's drifted from the resonance.
+  double BeamKineticEnergyMeVForEcm(double ecmAboveThresholdMeV) const;
+
+  // Samples a beam kinetic energy (lab) from a Breit-Wigner in CM energy,
+  // centered on the config's own resonanceEnergyMeV with width
+  // resonanceWidthMeV (RWID) -- or, if RWID is <=0 (not given), always
+  // returns BeamKineticEnergyMeV() exactly (a delta-function resonance).
+  // Retries (direct/inverse-CDF sampling, not naive accept/reject -- see
+  // the .cc) until the sampled energy falls within
+  // [keMinMeV, keMaxMeV] -- the beam kinetic energy range actually
+  // achievable while crossing the gas target, from PrimaryGeneratorAction.
+  // Throws std::runtime_error if it can't after many attempts (that range
+  // doesn't actually straddle the resonance -- a misconfiguration, not
+  // something to silently paper over).
+  double SampleBeamKineticEnergyMeV(double keMinMeV, double keMaxMeV) const;
+
   struct Event {
     G4ThreeVector recoilMomentumMeV;  // lab frame, MeV/c (ground-state recoil)
     double recoilEnergyMeV = 0.0;     // lab frame, total energy, MeV
@@ -44,6 +65,16 @@ class ReactionKinematics {
   // decay); no angular distributions/correlations are modeled anywhere in
   // the chain.
   Event GenerateEvent() const;
+
+  // Same, but for an explicit beam kinetic energy instead of always the
+  // one BeamKineticEnergyMeV() derives from the config's own
+  // resonanceEnergyMeV -- used once the beam's own real energy loss
+  // crossing the gas is tracked (see PrimaryGeneratorAction/
+  // GasStoppingPower), so each event's kinematics reflect the beam energy
+  // actually present at wherever in the target that event's vertex ends
+  // up, not a single fixed value regardless of depth.
+  // GenerateEvent() is exactly GenerateEvent(BeamKineticEnergyMeV()).
+  Event GenerateEvent(double beamKineticEnergyMeV) const;
 
  private:
   ReactionConfig fConfig;

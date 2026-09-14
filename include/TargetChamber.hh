@@ -70,4 +70,21 @@ void Build(G4LogicalVolume* worldLV, TargetGas gas);
 // kApertureLocalZCm/BeamApertureWorldYCm() comments.
 double BeamApertureWorldYCm();
 
+// Half the beam's total path length through the target gas (EAPG's own
+// center to XAPG's, both on the BeamApertureWorldYCm() line) -- i.e. the
+// beam enters the gas at world z=-BeamPathHalfLengthCm() and exits at
+// world z=+BeamPathHalfLengthCm(), both at world x=0,
+// y=BeamApertureWorldYCm(). Used by PrimaryGeneratorAction's beam-energy-
+// loss depth sampling (see GasStoppingPower) to know how much gas the
+// beam actually crosses.
+double BeamPathHalfLengthCm();
+
+// Name of the G4Material every gas-filled volume in this file (CELG, EAPG,
+// XAPG) is built from -- look it up with G4Material::GetMaterial(name)
+// after Build() has run (which any code calling this needs to have
+// happened already anyway, per the same ordering G4RunManager itself
+// guarantees: DetectorConstruction::Construct() before any event
+// generation), rather than building a second, merely similar material.
+const char* TargetGasMaterialName();
+
 }  // namespace TargetChamber

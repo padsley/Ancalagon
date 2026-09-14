@@ -367,6 +367,38 @@ int RunReactionTracking(int argc, char** argv) {
   return 0;
 }
 
+// Diagnostic: fires the actual *beam* ion (15O, not the recoil) through
+// the target region at a given kinetic energy (default: this pilot's own
+// design resonance energy, 258.5413 MeV/c), from just upstream of the gas
+// cell, along the same world-z beam axis and at
+// TargetChamber::BeamApertureWorldYCm() -- to directly measure the beam's
+// own real energy loss crossing the gas with full G4 tracking, e.g. to
+// re-derive/sanity-check a reaction config file's own BKIN card (see
+// README's "Reaction specification" and GasStoppingPower.hh, which do
+// this same calculation analytically/via G4EmCalculator for
+// PrimaryGeneratorAction's actual per-event use -- this mode is for
+// independently cross-checking that against real tracking, not something
+// the simulation itself depends on).
+int RunBeamThroughTarget(int argc, char** argv) {
+  auto* runManager = G4RunManagerFactory::CreateRunManager(G4RunManagerType::Serial);
+
+  runManager->SetUserInitialization(new DetectorConstruction("Chain"));
+  runManager->SetUserInitialization(new PhysicsList());
+  const double beamMomentumMeV = argc > 2 ? std::atof(argv[2]) : 258.5413;  // 15O at Er=0.5036 MeV
+  runManager->SetUserAction(new PrimaryGeneratorAction(
+      0.0, TargetChamber::BeamApertureWorldYCm(), beamMomentumMeV, -30.0, 8, 15, 8));
+  runManager->SetUserAction(new SteppingAction(8.0));
+  runManager->SetUserAction(new RunAction());
+  runManager->SetUserAction(new EventAction());
+  runManager->Initialize();
+
+  const int nEvents = argc > 3 ? std::atoi(argv[3]) : 1;
+  runManager->BeamOn(nEvents);
+
+  delete runManager;
+  return 0;
+}
+
 // Interactive/visual session: `dragon_g4_pilot --vis [element] [macro]`.
 // Opens a viewer (see macros/init_vis.mac -- picks whatever driver is
 // available, Qt/OGL/etc.) and either runs the given macro or drops into
@@ -458,6 +490,9 @@ int main(int argc, char** argv) {
   }
   if (argc > 1 && std::strcmp(argv[1], "--track-reaction") == 0) {
     return RunReactionTracking(argc, argv);
+  }
+  if (argc > 1 && std::strcmp(argv[1], "--track-beam") == 0) {
+    return RunBeamThroughTarget(argc, argv);
   }
   if (argc > 1 && std::strcmp(argv[1], "--reaction-stats") == 0) {
     return RunReactionStats(argc, argv);

@@ -69,6 +69,16 @@ ReactionConfig ReactionConfig::Load(const std::string& path) {
       }
       cfg.resonanceEnergyMeV = std::stod(tok[0]);
       haveEres = true;
+    } else if (card == "RWID") {
+      if (tok.empty()) {
+        throw std::runtime_error("ReactionConfig::Load: '" + path + "': RWID needs a value");
+      }
+      cfg.resonanceWidthMeV = std::stod(tok[0]);
+    } else if (card == "BKIN") {
+      if (tok.empty()) {
+        throw std::runtime_error("ReactionConfig::Load: '" + path + "': BKIN needs a value");
+      }
+      cfg.beamEntranceKineticEnergyMeV = std::stod(tok[0]);
     } else if (card == "LEVL") {
       if (tok.size() < 3) {
         throw std::runtime_error("ReactionConfig::Load: '" + path +

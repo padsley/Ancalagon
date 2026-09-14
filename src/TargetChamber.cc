@@ -94,6 +94,19 @@ constexpr double kBeamHeightCm = -kBoxHeight / 2.0 + 3.171;
 // after ~3.9 cm instead of ever reaching them. See BeamApertureWorldYCm().
 constexpr double kApertureLocalZCm = 2.008;
 
+// EAPG/XAPG's own local x=+-kApertureLocalXCm -- i.e. half the total beam
+// path length through the gas (EAPG center to XAPG center); see
+// BeamPathHalfLengthCm() below.
+constexpr double kApertureLocalXCm = 5.315;
+
+// Every gas-filled volume in CellAndApertures() (CELG, EAPG, XAPG) is
+// built from BuildGas() with this exact name -- exposed via
+// TargetGasMaterialName() so code outside this file (PrimaryGeneratorAction's
+// beam-energy-loss depth sampling, see GasStoppingPower) can look the same
+// G4Material up post-construction (G4Material::GetMaterial(name)) instead
+// of building a second, merely similar one.
+constexpr const char* kTargetGasMaterialName = "TargetGas";
+
 G4Material* BuildGas(const char* name, TargetChamber::TargetGas gas, double pressureFractionOfAtm) {
   G4NistManager* nist = G4NistManager::Instance();
   G4Material* stpReference = nist->FindOrBuildMaterial(NistNameFor(gas));
@@ -163,7 +176,7 @@ G4RotationMatrix* EapgXapgRotation() {
 void CellAndApertures(G4LogicalVolume* cmbgLV, TargetChamber::TargetGas gas) {
   G4NistManager* nist = G4NistManager::Instance();
   G4Material* aluminum = nist->FindOrBuildMaterial("G4_Al");
-  G4Material* targetGas = BuildGas("TargetGas", gas, kTargetPressureTorr / 760.0);
+  G4Material* targetGas = BuildGas(kTargetGasMaterialName, gas, kTargetPressureTorr / 760.0);
 
   // CELL: aluminum TRD1 outer shell. shape = (2.115, 6.759, 1.905, 4.208).
   auto* cellSolid = new G4Trd("CELL", 2.115 * cm, 6.759 * cm, 1.905 * cm, 1.905 * cm, 4.208 * cm);
@@ -179,22 +192,22 @@ void CellAndApertures(G4LogicalVolume* cmbgLV, TargetChamber::TargetGas gas) {
 
   // EAPG/XAPG: mtarg-gas TUBE beam apertures bored through CELL's slanted
   // side wall (tubetype==0 radii: EAPG rmax=0.3cm, XAPG rmax=0.4cm; both
-  // half-length 0.5cm), at local x=+-5.315cm, z=kApertureLocalZCm, y=0 --
-  // i.e. the real beam/recoil path through this cell is the line
+  // half-length 0.5cm), at local x=+-kApertureLocalXCm, z=kApertureLocalZCm,
+  // y=0 -- i.e. the real beam/recoil path through this cell is the line
   // (x varies, y=0, z=kApertureLocalZCm), not CELL's own local z=0 (see
   // BeamApertureWorldYCm() below).
   G4RotationMatrix* colRot = EapgXapgRotation();
   auto* eapgSolid = new G4Tubs("EAPG", 0.0, 0.3 * cm, 0.5 * cm, 0.0, 360.0 * deg);
   auto* eapgLV = new G4LogicalVolume(eapgSolid, targetGas, "EAPG");
   eapgLV->SetVisAttributes(G4VisAttributes(G4Colour(0.6, 0.6, 1.0, 0.4)));
-  new G4PVPlacement(colRot, G4ThreeVector(5.315 * cm, 0.0, kApertureLocalZCm * cm), eapgLV, "EAPG",
-                     cellLV, false, 0, true);
+  new G4PVPlacement(colRot, G4ThreeVector(kApertureLocalXCm * cm, 0.0, kApertureLocalZCm * cm),
+                     eapgLV, "EAPG", cellLV, false, 0, true);
 
   auto* xapgSolid = new G4Tubs("XAPG", 0.0, 0.4 * cm, 0.5 * cm, 0.0, 360.0 * deg);
   auto* xapgLV = new G4LogicalVolume(xapgSolid, targetGas, "XAPG");
   xapgLV->SetVisAttributes(G4VisAttributes(G4Colour(0.6, 0.6, 1.0, 0.4)));
-  new G4PVPlacement(colRot, G4ThreeVector(-5.315 * cm, 0.0, kApertureLocalZCm * cm), xapgLV, "XAPG",
-                     cellLV, false, 0, true);
+  new G4PVPlacement(colRot, G4ThreeVector(-kApertureLocalXCm * cm, 0.0, kApertureLocalZCm * cm),
+                     xapgLV, "XAPG", cellLV, false, 0, true);
 
   // CELL's placement inside CMBG (see kCellYInCmbgCm above).
   new G4PVPlacement(CellRotation(), G4ThreeVector(0.0, kCellYInCmbgCm * cm, 0.0), cellLV, "CELL",
@@ -578,3 +591,7 @@ double TargetChamber::BeamApertureWorldYCm() {
   // not at CELL's own center (world y = kCellYInCmbgCm + kBeamHeightCm).
   return kCellYInCmbgCm + kBeamHeightCm + kApertureLocalZCm;
 }
+
+double TargetChamber::BeamPathHalfLengthCm() { return kApertureLocalXCm; }
+
+const char* TargetChamber::TargetGasMaterialName() { return kTargetGasMaterialName; }

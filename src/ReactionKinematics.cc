@@ -54,21 +54,58 @@ double ReactionKinematics::LevelMassMeV(int level) const {
 }
 
 double ReactionKinematics::BeamKineticEnergyMeV() const {
-  const double W = fBeamMassMeV + fTargetMassMeV + fConfig.resonanceEnergyMeV;
+  return BeamKineticEnergyMeVForEcm(fConfig.resonanceEnergyMeV);
+}
+
+double ReactionKinematics::BeamKineticEnergyMeVForEcm(double ecmAboveThresholdMeV) const {
+  const double W = fBeamMassMeV + fTargetMassMeV + ecmAboveThresholdMeV;
   const double eBeam =
       (W * W - fBeamMassMeV * fBeamMassMeV - fTargetMassMeV * fTargetMassMeV) /
       (2.0 * fTargetMassMeV);
   return eBeam - fBeamMassMeV;
 }
 
+double ReactionKinematics::SampleBeamKineticEnergyMeV(double keMinMeV, double keMaxMeV) const {
+  if (fConfig.resonanceWidthMeV <= 0.0) return BeamKineticEnergyMeV();
+
+  // Direct (inverse-CDF) Breit-Wigner sampling, not naive accept/reject:
+  // this reaction's own width can be many orders of magnitude narrower
+  // than [keMinMeV, keMaxMeV] (e.g. ~50 eV against ~100s of keV for
+  // 15O(alpha,gamma)19Ne's own 4.03 MeV resonance -- see the reaction
+  // file's own RWID comment), so a uniform-then-reject sampler over that
+  // whole range would need on the order of (range/width) attempts per
+  // accepted sample -- here, thousands. tan() inverts the Lorentzian CDF
+  // directly; the only rejection needed afterwards is for the rare
+  // sample landing outside the physically achievable range at all (the
+  // Lorentzian's own heavy tails, or a below-threshold Ecm).
+  for (int attempt = 0; attempt < 10000; ++attempt) {
+    const double u = G4UniformRand();
+    const double ecm =
+        fConfig.resonanceEnergyMeV + 0.5 * fConfig.resonanceWidthMeV * std::tan(CLHEP::pi * (u - 0.5));
+    if (ecm <= 0.0) continue;  // below the beam+target threshold
+    const double keMeV = BeamKineticEnergyMeVForEcm(ecm);
+    if (keMeV >= keMinMeV && keMeV <= keMaxMeV) return keMeV;
+  }
+  throw std::runtime_error(
+      "ReactionKinematics::SampleBeamKineticEnergyMeV: no sample landed in [keMinMeV, keMaxMeV] "
+      "after 10000 attempts -- check that the target's entrance/exit beam energies actually "
+      "straddle the resonance (ERES/RWID vs BKIN and the target's own thickness)");
+}
+
 ReactionKinematics::Event ReactionKinematics::GenerateEvent() const {
-  // The compound resonance (level -1): formed from beam (along +z) +
-  // at-rest target, invariant mass W = beam+target+Er (same
-  // non-relativistic sum GEANT3 itself uses -- Er is negligible next to
-  // the beam/target rest masses).
-  const double W = fBeamMassMeV + fTargetMassMeV + fConfig.resonanceEnergyMeV;
-  const double eBeam = BeamKineticEnergyMeV() + fBeamMassMeV;
+  return GenerateEvent(BeamKineticEnergyMeV());
+}
+
+ReactionKinematics::Event ReactionKinematics::GenerateEvent(double beamKineticEnergyMeV) const {
+  const double eBeam = beamKineticEnergyMeV + fBeamMassMeV;
   const double pBeam = std::sqrt(eBeam * eBeam - fBeamMassMeV * fBeamMassMeV);
+  // The compound resonance (level -1): formed from beam (along +z) +
+  // at-rest target: invariant mass W follows from beam/target 4-momenta
+  // directly (reduces to beamMass+targetMass+Ecm when beamKineticEnergyMeV
+  // is exactly BeamKineticEnergyMeVForEcm(Ecm), as the two callers above
+  // both arrange).
+  const double W = std::sqrt(fBeamMassMeV * fBeamMassMeV + fTargetMassMeV * fTargetMassMeV +
+                              2.0 * eBeam * fTargetMassMeV);
 
   double parentMassMeV = W;
   double eParentLab = eBeam + fTargetMassMeV;

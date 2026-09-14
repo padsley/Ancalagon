@@ -16,6 +16,30 @@
 //   ERES  resonanceEnergyMeV                    -- CM energy above the beam+target
 //                                                  threshold at which the
 //                                                  compound state forms
+//   RWID  resonanceWidthMeV                     -- OPTIONAL: the resonance's total
+//                                                  width (CM, MeV). Omit (or use
+//                                                  <=0) to treat it as a delta
+//                                                  function at ERES exactly, the
+//                                                  original behavior. Needed for
+//                                                  BKIN's depth-sampling to sample
+//                                                  a Breit-Wigner rather than
+//                                                  always firing at exactly ERES.
+//   BKIN  beamEntranceKineticEnergyMeV          -- OPTIONAL: the beam's real lab
+//                                                  kinetic energy entering the
+//                                                  gas target. If given (and
+//                                                  positive), PrimaryGeneratorAction
+//                                                  tracks the beam's own energy
+//                                                  loss through the target gas
+//                                                  (see GasStoppingPower) and
+//                                                  places each event's vertex at
+//                                                  the depth where the
+//                                                  (Breit-Wigner-sampled, if RWID
+//                                                  is given) resonance energy is
+//                                                  actually crossed, instead of
+//                                                  at a single fixed point.
+//                                                  Omitting this keeps the
+//                                                  original fixed-vertex,
+//                                                  fixed-ERES-energy behavior.
 //   LEVL  level  excitationMeV  lifetimeSeconds -- one bound excited state of the
 //                                                  recoil nucleus below the
 //                                                  resonance; `level` is a
@@ -80,6 +104,8 @@ struct ReactionConfig {
   ParticleSpec recoil;
   int recoilChargeState = 0;
   double resonanceEnergyMeV = 0.0;
+  double resonanceWidthMeV = 0.0;             // RWID; <=0 means "delta function"
+  double beamEntranceKineticEnergyMeV = -1.0;  // BKIN; <=0 means "not given"
   std::map<int, Level> levels;  // keyed by level number, 0/-1 not stored here
   std::vector<Branch> branches;
 

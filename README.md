@@ -355,18 +355,48 @@ chain of two-body breakups (parent -> daughter + one gamma, isotropic in
 *that step's own parent's* rest frame) down through the recoil's real
 excited-state cascade to its ground state -- see "Reaction config file"
 below for how that cascade (and everything else about the reaction) is
-specified, not hardcoded. **Scope**: vertex kinematics only -- the whole
-chain is treated as instantaneous at the reaction vertex (no separate
-tracking of an excited intermediate recoil's own brief flight before its
-next decay), no angular distributions/correlations anywhere in the
-chain, no energy-loss straggling in the gas, and the recoil's charge
+specified, not hardcoded.
+
+**Beam energy loss through the gas target**: the beam doesn't react at a
+single, fixed energy regardless of where in the target it happens to be --
+it enters the gas at some real kinetic energy, continuously loses energy
+crossing it, and (for a narrow resonance) only actually populates the
+compound state over the thin slice of target where its degrading energy
+happens to cross the resonance. `ReactionConfig`'s optional `RWID`
+(resonance width, CM) and `BKIN` (beam kinetic energy entering the gas)
+cards turn this on: if `BKIN` is given, `PrimaryGeneratorAction` uses
+`GasStoppingPower` (a thin wrapper over `G4EmCalculator`, i.e. the *same*
+stopping-power physics this pilot's own `PhysicsList` registers, not an
+independently-sourced formula) to build a kinetic-energy-vs-depth table for
+the beam ion crossing the target gas, samples a beam kinetic energy per
+event from a Breit-Wigner centred on `ERES` with width `RWID` (a delta
+function at `ERES` if `RWID` isn't given), and places that event's vertex
+at the depth where the beam's own energy matches the sampled value --
+instead of a single fixed vertex/energy for every event. Omitting `BKIN`
+keeps the original fixed-vertex, fixed-`ERES`-energy behavior. This
+pilot's own bundled reaction file's `RWID` is measured (Utku et al., PRC
+57, 2731 (1998): the 4.03 MeV state's lifetime, 13(+9/-6) fs, gives
+Gamma=hbar/tau~=51 eV) -- narrow enough that the reaction is effectively
+localized to a single depth (a spread of ~1 mm, next to a ~10.6 cm target
+gas path); its `BKIN`, however, is a value chosen to put that depth at the
+target's own geometric midpoint, not a historical DRAGON beam-tune number
+(not tracked down) -- see the file's own comments.
+
+**Scope**: vertex kinematics only -- the whole chain is treated as
+instantaneous at the reaction vertex (no separate tracking of an excited
+intermediate recoil's own brief flight before its next decay), no angular
+distributions/correlations anywhere in the chain, no energy-loss
+*straggling* (the statistical spread around the mean energy loss
+`GasStoppingPower` computes -- Bohr/Landau-type fluctuations are not
+modeled, only the mean `G4EmCalculator` dE/dx), and the recoil's charge
 state is fixed at whatever the config file's own `RECL` card gives (4+
 for this pilot's own reaction), not sampled from a real charge-state
 distribution. `PrimaryGeneratorAction`'s reaction-file constructor fires
 the ground-state recoil ion plus one gamma per cascade step actually
 sampled (1-3 for this pilot's own reaction, see below) per event, all
-from a single vertex; `--track-reaction` and `--vis Reaction` use it in
-place of the fixed-momentum recoil gun `--track-chain`/`--vis Chain` use.
+from a single vertex (or, with `BKIN`, that event's own sampled-depth
+vertex); `--track-reaction` and `--vis Reaction` use it in place of the
+fixed-momentum recoil gun `--track-chain`/`--vis Chain` use.
 
 ### Reaction config file
 
@@ -384,6 +414,8 @@ BEAM 8   15   2.8554         # Z A massExcessMeV -- 15O
 TARG 2   4    2.42492        # 4He (target, at rest)
 RECL 10  19   1.7511   4     # 19Ne, production charge state 4+
 ERES 0.5036                  # CM resonance energy above threshold, MeV
+RWID 0.0000506                # resonance total width (CM, MeV) -- optional
+BKIN 2.4813                   # beam KE (lab) entering the gas -- optional
 
 LEVL   1   1.536   2.8E-11   # level# excitationMeV lifetimeS (19Ne 3/2+)
 LEVL   2   0.275   6.3E-11   # (19Ne 1/2)

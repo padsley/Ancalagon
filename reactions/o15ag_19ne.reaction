@@ -29,6 +29,33 @@ COMM number this repo's data files give for this configuration.
 COMM
 ERES 0.5036
 COMM
+COMM Resonance total width (CM): Utku et al., PRC 57, 2731 (1998), DSAM
+COMM lifetime tau=13(+9/-6) fs for this same 4.03 MeV state -> Gamma =
+COMM hbar/tau = 5.06e-5 MeV = 50.6 eV (using the central 13 fs value;
+COMM the measurement's own asymmetric uncertainty spans roughly 35-90 eV).
+COMM So narrow that it's several orders of magnitude below this target's
+COMM own beam energy loss crossing it (see BKIN below) -- physically, the
+COMM reaction occurs in an effectively single, thin slice of the target,
+COMM not smeared across it; RWID exists so PrimaryGeneratorAction's depth
+COMM sampling sees a (very narrow) Breit-Wigner rather than a literal
+COMM delta function.
+RWID 0.0000506
+COMM
+COMM Beam kinetic energy (lab) entering the gas cell (world z=-5.315cm,
+COMM the EAPG aperture -- see TargetChamber::BeamPathHalfLengthCm()), NOT
+COMM the same as the beam energy that hits ERES exactly (2.3913 MeV,
+COMM BeamKineticEnergyMeV() with no loss) -- given the resonance's own
+COMM negligible width, "centred in the target" for this file means the
+COMM depth at which the beam's own degrading energy crosses ERES should
+COMM sit at the gas path's geometric midpoint (halfway between the EAPG
+COMM and XAPG apertures). This value was tuned (via GasStoppingPower/
+COMM G4EmCalculator, the same stopping-power physics this pilot's own
+COMM PhysicsList registers) to put it there -- it is a *design choice*
+COMM for this pilot's own bundled file, not a historical DRAGON beam-tune
+COMM number (that hasn't been tracked down); replace it with the real
+COMM value if/when known.
+BKIN 2.4813
+COMM
 COMM Bound excited states of 19Ne below the resonance that this cascade
 COMM can pass through on its way to the ground state. Level numbers are
 COMM this file's own labels (arbitrary positive integers, need not be in

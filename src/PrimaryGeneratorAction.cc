@@ -3,13 +3,16 @@
 #include "G4Event.hh"
 #include "G4Gamma.hh"
 #include "G4IonTable.hh"
+#include "G4Material.hh"
 #include "G4ParticleDefinition.hh"
 #include "G4ParticleTable.hh"
 #include "G4PrimaryParticle.hh"
 #include "G4PrimaryVertex.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4ThreeVector.hh"
+#include "GasStoppingPower.hh"
 #include "ReactionConfig.hh"
+#include "TargetChamber.hh"
 
 PrimaryGeneratorAction::PrimaryGeneratorAction(double x0Cm, double y0Cm, double momentumMeV,
                                                 double z0Cm) {
@@ -33,17 +36,21 @@ PrimaryGeneratorAction::PrimaryGeneratorAction(double x0Cm, double y0Cm, double 
 
 PrimaryGeneratorAction::PrimaryGeneratorAction(const std::string& reactionFilePath, double x0Cm,
                                                double y0Cm, double z0Cm)
-    : fIsReaction(true), fReactionX0Cm(x0Cm), fReactionY0Cm(y0Cm), fReactionZ0Cm(z0Cm) {
-  const ReactionConfig config = ReactionConfig::Load(reactionFilePath);
-  fReaction = new ReactionKinematics(config);
-  fRecoilZ = config.recoil.Z;
-  fRecoilA = config.recoil.A;
-  fRecoilChargeState = config.recoilChargeState;
+    : fIsReaction(true),
+      fConfig(ReactionConfig::Load(reactionFilePath)),
+      fReactionX0Cm(x0Cm),
+      fReactionY0Cm(y0Cm),
+      fReactionZ0Cm(z0Cm) {
+  fReaction = new ReactionKinematics(fConfig);
+  fRecoilZ = fConfig.recoil.Z;
+  fRecoilA = fConfig.recoil.A;
+  fRecoilChargeState = fConfig.recoilChargeState;
 }
 
 PrimaryGeneratorAction::~PrimaryGeneratorAction() {
   delete fGun;
   delete fReaction;
+  delete fStoppingPower;
 }
 
 void PrimaryGeneratorAction::GeneratePrimaries(G4Event* event) {
@@ -61,9 +68,31 @@ void PrimaryGeneratorAction::GeneratePrimaries(G4Event* event) {
 }
 
 void PrimaryGeneratorAction::GenerateReactionPrimaries(G4Event* event) {
-  const ReactionKinematics::Event ev = fReaction->GenerateEvent();
+  double vertexZCm = fReactionZ0Cm;
+  double beamKineticEnergyMeV = fReaction->BeamKineticEnergyMeV();
 
-  const G4ThreeVector vertexPos(fReactionX0Cm * cm, fReactionY0Cm * cm, fReactionZ0Cm * cm);
+  // BKIN given: track the beam's own real energy loss through the target
+  // gas (see ReactionConfig.hh/GasStoppingPower.hh) instead of firing
+  // every event from the same fixed point at the same fixed (energy-
+  // loss-free) beam energy.
+  if (fConfig.beamEntranceKineticEnergyMeV > 0.0) {
+    if (!fStoppingPowerReady) {
+      G4Material* targetGas = G4Material::GetMaterial(TargetChamber::TargetGasMaterialName());
+      fStoppingPower =
+          new GasStoppingPower(fConfig.beam.Z, fConfig.beam.A, targetGas,
+                                fConfig.beamEntranceKineticEnergyMeV,
+                                2.0 * TargetChamber::BeamPathHalfLengthCm());
+      fStoppingPowerReady = true;
+    }
+    beamKineticEnergyMeV = fReaction->SampleBeamKineticEnergyMeV(
+        fStoppingPower->ExitKineticEnergyMeV(), fStoppingPower->EntranceKineticEnergyMeV());
+    const double depthCm = fStoppingPower->DepthForKineticEnergyCm(beamKineticEnergyMeV);
+    vertexZCm = -TargetChamber::BeamPathHalfLengthCm() + depthCm;
+  }
+
+  const ReactionKinematics::Event ev = fReaction->GenerateEvent(beamKineticEnergyMeV);
+
+  const G4ThreeVector vertexPos(fReactionX0Cm * cm, fReactionY0Cm * cm, vertexZCm * cm);
   auto* vertex = new G4PrimaryVertex(vertexPos, 0.0);
 
   G4ParticleDefinition* recoilIon = G4IonTable::GetIonTable()->GetIon(fRecoilZ, fRecoilA, 0.0);

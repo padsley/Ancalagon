@@ -4,7 +4,10 @@
 
 #include "G4ParticleGun.hh"
 #include "G4VUserPrimaryGeneratorAction.hh"
+#include "ReactionConfig.hh"
 #include "ReactionKinematics.hh"
+
+class GasStoppingPower;
 
 // Launches a single particle parallel to z, offset in x/y, from well
 // upstream of the first element -- equivalent to a GEANT3 gukine_mitray
@@ -58,6 +61,15 @@ class PrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction {
   // come from that same config's own RECL card, not hardcoded.
   bool fIsReaction = false;
   ReactionKinematics* fReaction = nullptr;
+  ReactionConfig fConfig;
   int fRecoilZ = 0, fRecoilA = 0, fRecoilChargeState = 0;
   double fReactionX0Cm = 0.0, fReactionY0Cm = 0.0, fReactionZ0Cm = 0.0;
+
+  // Beam-energy-loss depth sampling (only when fConfig.BKIN was given --
+  // see ReactionConfig.hh/GasStoppingPower.hh); built lazily on the first
+  // GeneratePrimaries() call, same reason/pattern as fNeedsIonLookup above
+  // (G4EmCalculator needs the physics list's tables, which don't exist yet
+  // when this class is constructed, before G4RunManager::Initialize()).
+  bool fStoppingPowerReady = false;
+  GasStoppingPower* fStoppingPower = nullptr;
 };
