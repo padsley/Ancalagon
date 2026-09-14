@@ -2,19 +2,28 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <set>
 #include <string>
+#include <vector>
 
 #include "DetectorConstruction.hh"
 #include "EventAction.hh"
 #include "RunAction.hh"
+#include "G4DynamicParticle.hh"
 #include "G4EmCalculator.hh"
+#include "G4Event.hh"
 #include "G4IonTable.hh"
 #include "G4Material.hh"
 #include "G4RunManagerFactory.hh"
+#include "G4Step.hh"
 #include "G4SystemOfUnits.hh"
+#include "G4Track.hh"
 #include "G4UIExecutive.hh"
 #include "G4UImanager.hh"
+#include "G4UserEventAction.hh"
+#include "G4UserSteppingAction.hh"
 #include "G4VisExecutive.hh"
+#include "G4VPhysicalVolume.hh"
 #include "MitrayDipoleField.hh"
 #include "MitrayEdipoleField.hh"
 #include "MitrayQuadrupoleField.hh"
@@ -239,9 +248,197 @@ int RunE2FieldProbe() {
                                2.0, -30.0, 30.0);
 }
 
+// Reaction config file path (see ReactionConfig.hh for the format,
+// reactions/o15ag_19ne.reaction for this pilot's own bundled reaction).
+// Mirrors src/ureact.f case(20)'s own convention (its LKINE=20 branch
+// reads a similar per-run config file named by the INPUT environment
+// variable) -- REACTION_INPUT here, not that exact name, to avoid
+// colliding with an unrelated pre-existing use of "INPUT" elsewhere.
+// Moved above BuildRunManager (it used to sit just above
+// RunReactionTracking) so the automatic-retuning code below, which needs
+// it too, can call it.
+std::string ReactionFilePath() {
+  const char* fromEnv = std::getenv("REACTION_INPUT");
+  return fromEnv ? std::string(fromEnv) : std::string("o15ag_19ne.reaction");
+}
+
+// --- Automatic "Chain" magnetic retuning for real recoil rigidity --------
+//
+// DetectorConstruction's own fallback (ComputeMagneticRetuneScale(), absent
+// a reaction file's RTUN card) only matches a reaction's *idealized*
+// (pre-target-energy-loss) recoil rigidity -- reasonable, but not corrected
+// for the real rigidity the recoil actually has by the time it reaches D1
+// after crossing the target gas/differential-pumping chain (see
+// reactions/o15ag_19ne.reaction's own RTUN card comment: that correction
+// was originally measured *by hand* -- build, run `--track-reaction 300`,
+// average |p| immediately before D1 over many events, divide by charge
+// state, divide by D1's native per-charge rigidity). SetUpRetunedChainGeometry()
+// below automates exactly that recipe for RunReactionTracking/RunVis's
+// "Reaction" branch (the two entry points that track a reaction's actual
+// recoil, as opposed to --track-chain's fixed design-orbit ion or
+// --track-beam's beam species) -- so it happens by default for whichever
+// reaction REACTION_INPUT currently points to, rather than requiring
+// someone to remember to hand-measure and paste in an RTUN card.
+//
+// This measurement needs real G4 tracking through an idealized-scale
+// "Chain" geometry first (to see how much rigidity the recoil actually
+// loses crossing real material), then a *second*, corrected geometry to
+// actually run the requested (visible-to-the-user) events through --
+// naively, two separate G4RunManagers. That crashes: G4RunManager's kernel
+// chain (G4RunManagerKernel -> G4EventManager -> G4TrackingManager ->
+// G4TrackingMessenger) registers UI commands with G4UImanager's singleton
+// command tree, and constructing a second G4RunManagerKernel in the same
+// process -- even after fully `delete`-ing the first -- segfaults inside
+// G4UImanager::AddNewCommand (confirmed empirically; not a documented
+// restriction, but a firm one on this Geant4 build regardless). The fix:
+// do BOTH phases on the *same* run manager, using G4RunManager's own
+// supported "swap in a new G4VUserDetectorConstruction and rebuild
+// geometry" mechanism (SetUserInitialization() again + ReinitializeGeometry(true),
+// which explicitly cleans up the old solids/logical/physical volumes
+// before invoking the new DetectorConstruction's Construct()) instead of
+// a second G4RunManager.
+
+// Clears the per-event "have I already recorded this track's D1 entrance
+// momentum" bookkeeping (see RigidityCalibrationStepping) -- track IDs are
+// reused (reset to 1) across events, so without this a track ID recorded in
+// one event would silently suppress recording the same ID's D1 crossing in
+// a later event.
+class RigidityCalibrationEvent : public G4UserEventAction {
+ public:
+  explicit RigidityCalibrationEvent(std::set<G4int>* recordedTrackIds)
+      : fRecordedTrackIds(recordedTrackIds) {}
+  void BeginOfEventAction(const G4Event*) override { fRecordedTrackIds->clear(); }
+
+ private:
+  std::set<G4int>* fRecordedTrackIds;
+};
+
+// Silent analogue of SteppingAction, purpose-built for the calibration run:
+// no printed output, just the recoil's own momentum magnitude the instant
+// it enters D1's field container (mirroring the manual recipe's "row
+// immediately preceding a D1-volume row" -- vacuum-to-vacuum, so there's no
+// material energy loss right at that boundary to distinguish the two). The
+// mass>=30000 MeV cut (below any gamma/e-/e+/proton, well below any of this
+// pilot's own recoil ions) is the same trick SteppingAction's TRAJ dump
+// output already relies on to separate the recoil's own trajectory from its
+// correlated gammas'/secondaries'.
+class RigidityCalibrationStepping : public G4UserSteppingAction {
+ public:
+  RigidityCalibrationStepping(double nominalChargeIonE, std::vector<double>* samplesMeV,
+                               std::set<G4int>* recordedTrackIds)
+      : fNominalChargeIonE(nominalChargeIonE),
+        fSamplesMeV(samplesMeV),
+        fRecordedTrackIds(recordedTrackIds) {}
+
+  void UserSteppingAction(const G4Step* step) override {
+    G4Track* track = step->GetTrack();
+    // Same fix as SteppingAction's own -- without it, G4ionIonisation's
+    // effective-charge model would drift this ion's tracked charge away
+    // from its real, fixed charge state, corrupting the very rigidity this
+    // is trying to measure.
+    if (track->GetParticleDefinition()->GetParticleType() == "nucleus") {
+      const_cast<G4DynamicParticle*>(track->GetDynamicParticle())->SetCharge(fNominalChargeIonE * eplus);
+    }
+    if (track->GetDynamicParticle()->GetMass() / MeV < 30000.0) return;  // not the recoil
+
+    const G4VPhysicalVolume* preVol = step->GetPreStepPoint()->GetPhysicalVolume();
+    if (preVol && preVol->GetName() == "D1" && fRecordedTrackIds->insert(track->GetTrackID()).second) {
+      fSamplesMeV->push_back(step->GetPreStepPoint()->GetMomentum().mag() / MeV);
+    }
+  }
+
+ private:
+  double fNominalChargeIonE;
+  std::vector<double>* fSamplesMeV;
+  std::set<G4int>* fRecordedTrackIds;
+};
+
+// Sets up `runManager` (freshly created, nothing registered on it yet) with
+// a "Chain" DetectorConstruction/PhysicsList tuned to the real, measured
+// magnetic retune scale for whichever reaction REACTION_INPUT currently
+// points to -- or, if that reaction file already has its own RTUN card,
+// just that value directly (an explicit override always wins, e.g. for a
+// hand-tuned figure someone prefers over the automatic measurement). The
+// caller still has to register its own primary generator/stepping/run/
+// event actions and call Initialize() + BeamOn() itself -- this only
+// leaves the geometry/physics user-initializations in place.
+//
+// When a measurement is needed: phase 1 builds an *idealized*-scale
+// geometry (Q1-Q7 need *some* reasonable scale to reach D1 at all -- fine,
+// not circular, since a magnetic field does no work, so |p| at D1's own
+// entrance is retune-scale-invariant: whatever scale bends Q1-Q7 changes
+// the recoil's direction, not its own momentum magnitude, by the time it
+// reaches D1, so any reasonable starting scale gives the same
+// measurement), fires 300 real reaction events with no printed output, and
+// records the recoil's own momentum the instant it enters D1. Phase 2
+// swaps in a fresh DetectorConstruction built with that measured scale and
+// calls ReinitializeGeometry(true) to actually rebuild the geometry/fields
+// with it (see the "Automatic Chain magnetic retuning" comment above for
+// why this has to happen on the same run manager, not a second one).
+void SetUpRetunedChainGeometry(G4RunManager* runManager) {
+  const ReactionConfig cfg = ReactionConfig::Load(ReactionFilePath());
+
+  if (cfg.magneticFieldRetuneScale > 0.0) {
+    runManager->SetUserInitialization(new DetectorConstruction("Chain", cfg.magneticFieldRetuneScale));
+    runManager->SetUserInitialization(new PhysicsList());
+    return;
+  }
+
+  // Phase 1: idealized-scale geometry, just to reach D1 for calibration.
+  constexpr int kCalibrationEvents = 300;
+  runManager->SetUserInitialization(new DetectorConstruction("Chain"));
+  runManager->SetUserInitialization(new PhysicsList());
+  runManager->SetUserAction(new PrimaryGeneratorAction(ReactionFilePath(), 0.0,
+                                                        TargetChamber::BeamApertureWorldYCm(), 0.0));
+  std::vector<double> samplesMeV;
+  std::set<G4int> recordedTrackIds;
+  runManager->SetUserAction(
+      new RigidityCalibrationStepping(cfg.recoilChargeState, &samplesMeV, &recordedTrackIds));
+  runManager->SetUserAction(new RigidityCalibrationEvent(&recordedTrackIds));
+  runManager->Initialize();
+  runManager->BeamOn(kCalibrationEvents);
+
+  const MitrayDipoleData d1 = MitrayDipoleData::D1();
+  const double nativeRigidityMeVPerCharge = 0.3 * d1.BF * (d1.RB / 100.0) * 1000.0;
+
+  double scale;
+  if (samplesMeV.empty()) {
+    // No calibration event reached D1 at all -- e.g. a reaction whose
+    // idealized-rigidity recoil doesn't even clear the target chamber's own
+    // apertures. Fall back to the purely idealized (pre-target-energy-loss)
+    // scale rather than dividing by zero.
+    std::fprintf(stderr,
+                 "WARNING: SetUpRetunedChainGeometry: no calibration event reached D1 "
+                 "(0/%d) -- falling back to idealized (pre-target-energy-loss) rigidity.\n",
+                 kCalibrationEvents);
+    scale = ComputeMagneticRetuneScale(cfg);
+  } else {
+    double sumP = 0.0;
+    for (double p : samplesMeV) sumP += p;
+    const double meanP = sumP / samplesMeV.size();
+    scale = (meanP / cfg.recoilChargeState) / nativeRigidityMeVPerCharge;
+    std::printf(
+        "Auto-measured separator retune scale: %.6f (mean |p| at D1 entrance = %.4f MeV/c, "
+        "%zu/%d calibration events reached D1)\n",
+        scale, meanP, samplesMeV.size(), kCalibrationEvents);
+  }
+
+  // Phase 2: rebuild geometry/fields with the corrected scale. The caller
+  // registers its own (real) primary generator/stepping/run/event actions
+  // next, then calls Initialize() + BeamOn() -- that Initialize() call is
+  // what actually applies the ReinitializeGeometry(true) request below.
+  runManager->SetUserInitialization(new DetectorConstruction("Chain", scale));
+  runManager->ReinitializeGeometry(true);
+}
+
 // Builds and initializes a run manager for `element` ("Q1", "D1", "Chain",
 // etc.), wiring up the matching primary generator. Shared by the batch
-// (--track*) and interactive/visual (--vis) entry points.
+// (--track*) and interactive/visual (--vis) entry points. Uses
+// ComputeMagneticRetuneScale's own idealized-or-RTUN-card fallback for
+// "Chain" (not the automatic measurement above) -- --track-chain fires a
+// fixed design-orbit ion, not any reaction's actual recoil, so there's no
+// real per-reaction rigidity to measure here the way there is for
+// RunReactionTracking/RunVis's "Reaction" branch.
 G4RunManager* BuildRunManager(const std::string& element, double x0Cm, double y0Cm, double pMeV,
                                double z0Cm) {
   auto* runManager = G4RunManagerFactory::CreateRunManager(G4RunManagerType::Serial);
@@ -317,17 +514,6 @@ double DefaultMomentumMeV(const std::string& element) {
   return 15000.0;                         // ~150 MeV/u for A=100-ish
 }
 
-// Reaction config file path (see ReactionConfig.hh for the format,
-// reactions/o15ag_19ne.reaction for this pilot's own bundled reaction).
-// Mirrors src/ureact.f case(20)'s own convention (its LKINE=20 branch
-// reads a similar per-run config file named by the INPUT environment
-// variable) -- REACTION_INPUT here, not that exact name, to avoid
-// colliding with an unrelated pre-existing use of "INPUT" elsewhere.
-std::string ReactionFilePath() {
-  const char* fromEnv = std::getenv("REACTION_INPUT");
-  return fromEnv ? std::string(fromEnv) : std::string("o15ag_19ne.reaction");
-}
-
 int RunTracking(const std::string& element, int argc, char** argv) {
   const double x0Cm = argc > 2 ? std::atof(argv[2]) : 1.0;
   const double y0Cm = argc > 3 ? std::atof(argv[3]) : 0.0;
@@ -384,9 +570,7 @@ int RunReactionStats(int argc, char** argv) {
 
 int RunReactionTracking(int argc, char** argv) {
   auto* runManager = G4RunManagerFactory::CreateRunManager(G4RunManagerType::Serial);
-
-  runManager->SetUserInitialization(new DetectorConstruction("Chain"));
-  runManager->SetUserInitialization(new PhysicsList());
+  SetUpRetunedChainGeometry(runManager);
   runManager->SetUserAction(
       new PrimaryGeneratorAction(ReactionFilePath(), 0.0, TargetChamber::BeamApertureWorldYCm(), 0.0));
   // See SteppingAction's own comment: without this, G4ionIonisation's
@@ -451,8 +635,7 @@ int RunVis(int argc, char** argv) {
   G4RunManager* runManager;
   if (element == "Reaction") {
     runManager = G4RunManagerFactory::CreateRunManager(G4RunManagerType::Serial);
-    runManager->SetUserInitialization(new DetectorConstruction("Chain"));
-    runManager->SetUserInitialization(new PhysicsList());
+    SetUpRetunedChainGeometry(runManager);
     runManager->SetUserAction(new PrimaryGeneratorAction(ReactionFilePath(), 0.0,
                                                           TargetChamber::BeamApertureWorldYCm(), 0.0));
     runManager->SetUserAction(

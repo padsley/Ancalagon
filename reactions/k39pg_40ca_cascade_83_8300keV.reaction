@@ -1,0 +1,35 @@
+COMM 39K(p,gamma)40Ca two-step gamma cascade scan -- file 83 of 88.
+COMM Same beam/target/recoil/resonance physics as
+COMM reactions/k39pg_40ca.reaction (see that file's own comments for the
+COMM full mass/kinematics derivation and caveats -- unchanged here); this
+COMM file only replaces the gamma-decay cascade with a single FICTIONAL
+COMM intermediate level, for a controlled two-step-cascade energy scan.
+COMM
+COMM Resonance (compound 40Ca) excitation above ground: Ex = Q + Er =
+COMM 8.32777 + 0.606 = 8.93377 MeV. This series steps one intermediate
+COMM level's excitation from 0.1 MeV to (Ex - 0.1 MeV) = 8.83377 MeV
+COMM in 0.1 MeV steps -- file NN puts it at NN*0.1 MeV.
+COMM
+COMM THIS FILE: intermediate level at 8.3000 MeV -- gamma-cascade
+COMM energies (before recoil-kinematics corrections, which this pilot's
+COMM ReactionKinematics does apply): gamma1 = Ex - 8.3000 = 0.6338 MeV
+COMM (resonance -> intermediate), gamma2 = 8.3000 MeV (intermediate ->
+COMM ground). Every event emits exactly two gammas (100% two-step
+COMM branching, no direct-to-ground branch) -- verify with
+COMM `--reaction-stats <this file>`.
+COMM
+COMM The intermediate level's lifetime below is a placeholder (1e-12 s),
+COMM fictional like the level itself and unused by the kinematics (see
+COMM ReactionConfig.hh's own LEVL card comment: this pilot's cascade is
+COMM instantaneous-at-vertex, not a real modeled flight time).
+
+BEAM 19  39   -33.8072      # Z A massExcessMeV -- 39K
+TARG 1   1    7.28897       # 1H (target, at rest)
+RECL 20  40   -34.8460   8  # 40Ca, placeholder charge state (see k39pg_40ca.reaction)
+ERES 0.606                  # CM resonance energy above threshold, MeV
+
+LEVL   1   8.3000   1.0E-12   # fictional intermediate level (scan step 83/88)
+
+BRAT   -1  100.0   1        # resonance -> intermediate, 100%
+BRAT    1  100.0   0        # intermediate -> ground, 100%
+SENT

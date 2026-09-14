@@ -85,6 +85,16 @@ const G4VisAttributes kCollimatorVis(G4Colour(0.85, 0.45, 0.2));  // copper
 // i.e. KE/q=E*RB/2 (README's "Tracking spot-checks") -- for fixed
 // mass/charge, KE (non-relativistic) scales as p^2, so E1/E2's EFF gets
 // the *square* of the same ratio (see the "Chain" call sites).
+
+}  // namespace
+
+// This is declared in DetectorConstruction.hh (external linkage, not
+// anonymous-namespace-local like everything else here) so main.cc's
+// automatic calibration pass (ResolveChainMagneticRetuneScale()) can reuse
+// it -- both to bootstrap its own throwaway calibration geometry (Q1-Q7
+// need *some* reasonable scale to reach D1 at all -- see that function's
+// own comment for why this idealized one is fine for that) and as its own
+// fallback if a calibration run somehow has zero events reach D1.
 double ComputeMagneticRetuneScale(const ReactionConfig& cfg) {
   // ReactionConfig's own RTUN card (see ReactionConfig.hh) lets a
   // reaction file supply an empirically-measured scale -- the recoil's
@@ -98,7 +108,12 @@ double ComputeMagneticRetuneScale(const ReactionConfig& cfg) {
   // *idealized* (pre-target-energy-loss) recoil rigidity -- a reasonable
   // first cut (it's the same rigor dat/dragon_2014_DSSSD.dat's own card
   // values were originally set to), just not corrected for real energy
-  // loss the way a measured RTUN value is.
+  // loss the way a measured RTUN value is. In practice this fallback is
+  // now rarely reached directly -- main.cc's "Chain"-building entry
+  // points call ResolveChainMagneticRetuneScale() instead, which measures
+  // the real, energy-loss-degraded value automatically (see its own
+  // comment) whenever a reaction file omits RTUN, rather than settling
+  // for this idealized number the way earlier versions of this pilot did.
   if (cfg.magneticFieldRetuneScale > 0.0) return cfg.magneticFieldRetuneScale;
 
   const ReactionKinematics reaction(cfg);
@@ -119,6 +134,8 @@ double ComputeMagneticRetuneScale(const ReactionConfig& cfg) {
 
   return (meanRecoilMomentumMeV / cfg.recoilChargeState) / nativeRigidityMeVPerCharge;
 }
+
+namespace {
 
 MitrayPoleData RetunedQuad(MitrayPoleData d, double magneticScale) {
   d.BQD *= magneticScale;
@@ -695,10 +712,18 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     BgoArray::Build(worldLV);
     G4Material* copper = nist->FindOrBuildMaterial("G4_Cu");  // ugstmed.f medium 5
 
-    // See ComputeMagneticRetuneScale's own comment for the derivation;
-    // electricScale is that same ratio squared (E1/E2's design condition
-    // depends on KE, not p -- see the "Retuning" comment block above).
-    const double magneticScale = ComputeMagneticRetuneScale(reactionConfig);
+    // fMagneticRetuneScaleOverride (see DetectorConstruction.hh) lets a
+    // caller inject an already-resolved scale -- main.cc's "Chain"-building
+    // entry points always do (ResolveChainMagneticRetuneScale() there
+    // measures the real, energy-loss-degraded value rather than settling
+    // for ComputeMagneticRetuneScale's own idealized fallback). <=0 (only
+    // reachable if some future call site forgets to resolve one) falls
+    // back to that same old behavior. electricScale is that ratio squared
+    // either way (E1/E2's design condition depends on KE, not p -- see the
+    // "Retuning" comment block above).
+    const double magneticScale = (fMagneticRetuneScaleOverride > 0.0)
+                                      ? fMagneticRetuneScaleOverride
+                                      : ComputeMagneticRetuneScale(reactionConfig);
     const double electricScale = magneticScale * magneticScale;
 
     ChainState s;

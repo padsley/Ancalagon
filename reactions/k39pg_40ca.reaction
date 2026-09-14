@@ -46,31 +46,39 @@ COMM    way the bundled 19Ne file's 4+ is (that one was cross-checked
 COMM    against this pilot's own D1/D2/E1/E2 design rigidities). Replace
 COMM    with a real measured/expected charge-state fraction if you have
 COMM    one for 40Ca at ~0.6 MeV/u.
-COMM  - The separator and target gas are now BOTH reaction-driven (no
-COMM    longer hardcoded for 15O(a,g)19Ne -- see DetectorConstruction.cc's
-COMM    "Chain" builder and ComputeMagneticRetuneScale()): the target
-COMM    chamber fills with hydrogen automatically (TARG's own A=1), and
-COMM    every Q1-Q14/D1/D2/E1/E2 field strength is scaled from this
-COMM    reaction's own idealized (pre-target-energy-loss) recoil rigidity
-COMM    (p~1320 MeV/c / q=8 -> p/q~165 MeV/c, vs D1's native 64.68 MeV/c
-COMM    per unit charge -- automatically computed, no RTUN card needed
-COMM    here). Verified: an idealized on-axis particle now bends through
-COMM    D1 (~49.5deg vs 50deg design) and D2 (~73.7deg vs 75deg design)
-COMM    correctly, and real --track-reaction events actually reach the
-COMM    DSSSD (29/200 in one test run) -- something 15O(a,g)19Ne itself
-COMM    only does at the ~1% level even after this session's own D2/field
-COMM    refinement (see git history), because this reaction's kinematic
-COMM    spread happens to be much smaller relative to its own momentum.
-COMM  - What this automatic retuning does NOT do: correct for this
-COMM    reaction's own real, energy-loss-degraded rigidity by the time
-COMM    the recoil reaches D1 (crossing the hydrogen target/pumping
-COMM    chain) -- it only matches the idealized vertex value, exactly the
-COMM    rigor dat/dragon_2014_DSSSD.dat's own original card values had for
-COMM    19Ne before this session's refinement. Add an RTUN card (see
-COMM    ReactionConfig.hh) with the real measured value once known -- same
-COMM    recipe as o15ag_19ne.reaction's own RTUN card comment: build, run
-COMM    `--track-reaction 300`, average |p| immediately before D1 (mass
-COMM    >37000 here) over many events, divide by 8, divide by 64.68.
+COMM  - The separator and target gas are both reaction-driven (no longer
+COMM    hardcoded for 15O(a,g)19Ne -- see DetectorConstruction.cc's
+COMM    "Chain" builder): the target chamber fills with hydrogen
+COMM    automatically (TARG's own A=1), and every Q1-Q14/D1/D2/E1/E2 field
+COMM    strength is scaled off this reaction's own recoil rigidity.
+COMM
+COMM RTUN below is no longer hand-measured: main.cc's
+COMM SetUpRetunedChainGeometry() now runs this measurement automatically,
+COMM for any reaction file that omits RTUN -- build a throwaway idealized-
+COMM scale "Chain" geometry, fire 300 real --track-reaction-equivalent
+COMM events, average the recoil's own |p| the instant it enters D1, divide
+COMM by charge state, divide by D1's native 64.68 MeV/c-per-charge
+COMM rigidity (same recipe o15ag_19ne.reaction's own RTUN was originally
+COMM measured by hand with). The value below is that automatic
+COMM measurement's own printed output, pasted in here so a standalone run
+COMM of this file doesn't have to redo the 300-event calibration pass every
+COMM time (an explicit RTUN card always short-circuits it) -- not because
+COMM the automatic default can't be trusted; it can, for any reaction file
+COMM that omits this card.
+COMM
+COMM Measured: mean |p| = 1311.24 MeV/c at D1's own entrance (300/300
+COMM --track-reaction events reaching D1), against ERES/kinematics'
+COMM idealized (pre-target-energy-loss) vertex value of ~1320 MeV/c -- only
+COMM a ~0.7% correction (this reaction's kinematic spread is much smaller
+COMM relative to its own momentum than 15O(a,g)19Ne's, per the "no RTUN
+COMM card needed" note this replaced), but still nearly doubles DSSSD
+COMM transmission at the mass slit (MSLT, a narrow +-1.25cm dispersive
+COMM focus just past E1): 2000 --track-reaction events measured 226/2000
+COMM (11.3%) reaching the DSSSD at the idealized-only scale, 440/2000
+COMM (22.0%) at this measured one -- MSLT and its upstream collimator RC27
+COMM still account for ~76% of all losses either way (this correction
+COMM narrows the mismatch at that slit, it doesn't eliminate it).
+RTUN 2.533954
 
 BEAM 19  39   -33.8072      # Z A massExcessMeV -- 39K
 TARG 1   1    7.28897       # 1H (target, at rest)

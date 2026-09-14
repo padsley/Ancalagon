@@ -5,6 +5,19 @@
 #include "G4VUserDetectorConstruction.hh"
 #include "MitrayQuadrupoleField.hh"
 
+struct ReactionConfig;
+
+// Idealized (pre-target-energy-loss) fallback for the "Chain" magnetic
+// retune scale -- a reaction file's own RTUN card if present, else this
+// reaction's own idealized recoil rigidity vs. D1's native per-charge
+// rigidity (see DetectorConstruction.cc's own "Retuning" comment block for
+// the full derivation). Exposed (not anonymous-namespace-local) so
+// main.cc's SetUpRetunedChainGeometry() can reuse it: once to bootstrap its
+// own throwaway calibration geometry (Q1-Q7 just need *some* reasonable
+// scale to reach D1 -- see that function's own comment), and again as its
+// own fallback for the rare case its measurement fails to reach D1 at all.
+double ComputeMagneticRetuneScale(const ReactionConfig& cfg);
+
 // Minimal geometry: a vacuum world containing volumes for the
 // pilot-ported MITRAY elements, selected by name:
 //  - "Q1".."Q14": just that quadrupole, standalone, at theta=0 -- a tube
@@ -44,7 +57,25 @@
 //    GEANT3's own bookkeeping.
 class DetectorConstruction : public G4VUserDetectorConstruction {
  public:
-  explicit DetectorConstruction(std::string element = "Q1") : fElement(std::move(element)) {}
+  // magneticRetuneScaleOverride: when >0, used directly as "Chain"'s own
+  // magnetic field-strength retune scale (electricScale = that value
+  // squared -- see DetectorConstruction.cc's "Retuning" comment block),
+  // bypassing this class's own reaction-file-driven computation entirely.
+  // <=0 (the default) means "compute it the usual way" -- a reaction
+  // file's own RTUN card if present, else ComputeMagneticRetuneScale()'s
+  // idealized (pre-target-energy-loss) fallback. main.cc's reaction-driven
+  // entry points (RunReactionTracking, RunVis's "Reaction" branch) resolve
+  // and pass an explicit, *measured* value instead (see
+  // SetUpRetunedChainGeometry() there) -- this default is what lets that
+  // same function build its own throwaway calibration geometry (deliberately
+  // NOT passing an override, to get the idealized fallback to bootstrap
+  // from) before it knows the measured value. Other "Chain"-building call
+  // sites (--track-chain, --vis Chain, --probe-recoil-dedx, --track-beam)
+  // don't track any reaction's actual recoil, so they just keep using this
+  // default (RTUN-card-or-idealized) too, via BuildRunManager/
+  // RunBeamThroughTarget.
+  explicit DetectorConstruction(std::string element = "Q1", double magneticRetuneScaleOverride = -1.0)
+      : fElement(std::move(element)), fMagneticRetuneScaleOverride(magneticRetuneScaleOverride) {}
 
   G4VPhysicalVolume* Construct() override;
 
@@ -72,4 +103,5 @@ class DetectorConstruction : public G4VUserDetectorConstruction {
 
  private:
   std::string fElement;
+  double fMagneticRetuneScaleOverride;
 };
