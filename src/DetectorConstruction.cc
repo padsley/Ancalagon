@@ -1,6 +1,7 @@
 #include "DetectorConstruction.hh"
 
 #include <cmath>
+#include <cstdlib>
 
 #include "G4Box.hh"
 #include "G4ChordFinder.hh"
@@ -26,6 +27,8 @@
 #include "DsssdSD.hh"
 #include "MitrayDipoleField.hh"
 #include "MitrayEdipoleField.hh"
+#include "ReactionConfig.hh"
+#include "ReactionKinematics.hh"
 #include "RotateAboutY.hh"
 #include "TargetChamber.hh"
 
@@ -40,8 +43,8 @@ const G4VisAttributes kDipoleVis(G4Colour(1.0, 0.3, 0.3));
 const G4VisAttributes kEdipoleVis(G4Colour(0.3, 1.0, 0.3));
 const G4VisAttributes kCollimatorVis(G4Colour(0.85, 0.45, 0.2));  // copper
 
-// --- Retuning the separator for the recoil's real, energy-loss-degraded
-// rigidity (not the idealized pre-target-loss vertex momentum) -----------
+// --- Retuning the separator for whichever reaction is actually loaded,
+// not just the bundled 15O(alpha,gamma)19Ne one --------------------------
 //
 // Every 'POLE'/'DIPO'/'EDIP' card's field-strength value in
 // dat/dragon_2014_DSSSD.dat is set for a 19Ne4+ recoil at exactly 258.7
@@ -49,67 +52,85 @@ const G4VisAttributes kCollimatorVis(G4Colour(0.85, 0.45, 0.2));  // copper
 // any of the target gas, differential-pumping chain, or collimators (see
 // README's "Reaction specification": that's literally how the 258.7 MeV/c
 // design orbit was identified in the first place, from D1/D2/E1/E2's own
-// card values). But the recoil measurably loses rigidity crossing that
-// material before it ever reaches Q1 -- confirmed empirically (300
-// `--track-reaction` events, real BKIN-vertex-sampled reactions, |p| at
-// D1's own entrance): mean 249.4 MeV/c, range 244.1-254.2 MeV/c, against
-// the 258.7 MeV/c design value. A magnet built and never re-tuned for that
-// difference bends the recoil ~3-4% more sharply than its downstream
-// neighbours expect; a dipole-driven dispersive element chained together
-// with a purpose-built, narrow charge-state-selecting slit (QSLT, only
-// +-1.25cm) turns that modest rigidity error into position errors of tens
-// of cm at the slit -- confirmed to be the actual, reproducible cause of
-// this pilot's 0/200 DSSSD transmission (see the session that derived
-// this comment for the full derivation, including a controlled
-// standalone-D1 check that rules out a field-port coding bug: the bend
-// angle grows smoothly and monotonically, 49.9deg at design rigidity to
-// ~53deg at the recoil's real rigidity, exactly as ordinary momentum
-// dispersion in a bending magnet should).
+// card values). That's a property of the *specific reaction* the file was
+// designed around, not of the separator hardware itself -- a different
+// reaction config (different masses, ERES, recoil charge state) produces
+// a recoil at a completely different rigidity, and the same fixed
+// hardware needs a correspondingly different field strength to still bend
+// it by its design angles. ComputeMagneticRetuneScale() below is that
+// calculation, generalized: it no longer hardcodes one reaction's own
+// empirically-measured ratio.
 //
 // A real separator operator retunes magnet currents/deflector voltages
-// for the beam actually delivered, not an idealized upstream value, while
-// leaving the hardware (positions, apertures, pole/electrode geometry)
-// untouched -- that's what this does: scale only each element's
-// field-STRENGTH parameters (verified linear in the field formula itself,
-// see MitrayQuadrupoleField::Bpoles' grad1..grad5 / MitrayDipoleField's
-// BF-only-appears-via-"db=BF-br" / MitrayEdipoleField's edip() "ef"
-// argument), leaving every geometric parameter (aperture radii, Z11..Z22
-// zone boundaries, RB, PHI, ALPHA/BETA, the dimensionless Enge C0..C5
-// fringe coefficients) exactly as the real card specifies. This is why
-// the scaling is applied to a *copy* of each element's data at the "Chain"
-// call site, never to the canonical MitrayPoleData::Q1()/etc. factories
-// themselves -- those remain the untouched, bit-exact-validated real card
-// values the standalone tracking modes and --probe* field-grid validation
-// still depend on.
+// for the beam actually delivered, while leaving the hardware (positions,
+// apertures, pole/electrode geometry) untouched -- that's what this does:
+// scale only each element's field-STRENGTH parameters (verified linear in
+// the field formula itself, see MitrayQuadrupoleField::Bpoles'
+// grad1..grad5 / MitrayDipoleField's BF-only-appears-via-"db=BF-br" /
+// MitrayEdipoleField's edip() "ef" argument), leaving every geometric
+// parameter (aperture radii, Z11..Z22 zone boundaries, RB, PHI,
+// ALPHA/BETA, the dimensionless Enge C0..C5 fringe coefficients) exactly
+// as the real card specifies. This is why the scaling is applied to a
+// *copy* of each element's data at the "Chain" call site, never to the
+// canonical MitrayPoleData::Q1()/etc. factories themselves -- those
+// remain the untouched, bit-exact-validated real card values the
+// standalone tracking modes and --probe* field-grid validation still
+// depend on.
 //
-// For a magnetic element, r=p/(qB) at fixed geometric radius r means
-// B must scale linearly with p -- hence kRetunedRigidityScale (the ratio
-// of the recoil's real mean rigidity to the design one) applied directly
-// to BQD/BHX/BOC/BDC/BDD (quads) and BF (dipoles). An electrostatic
-// deflector's design condition instead balances qE=mv^2/RB, i.e.
-// KE/q=E*RB/2 (README's "Tracking spot-checks") -- for fixed mass/charge,
-// KE (non-relativistic) scales as p^2, so E1/E2's EFF gets the *square*
-// of the same ratio.
-//
-// Reproduce/update the measured ratio: build, then
-//   ./dragon_g4_pilot --track-reaction 300 2>&1 | grep '^TRAJ'
-// and average |p| over every row immediately preceding a "D1"-volume row
-// (the recoil's own entrance momentum to D1, world frame, mass>17000).
-constexpr double kRetunedRigidityScale = 249.4 / 258.7;             // magnetic elements
-constexpr double kRetunedElectricScale =
-    kRetunedRigidityScale * kRetunedRigidityScale;                  // electrostatic elements
+// For a magnetic element, r=p/(qB) at fixed geometric radius r means B
+// must scale linearly with p -- hence the returned scale (the ratio of
+// the recoil's own rigidity to D1's native per-charge rigidity) applied
+// directly to BQD/BHX/BOC/BDC/BDD (quads) and BF (dipoles). An
+// electrostatic deflector's design condition instead balances qE=mv^2/RB,
+// i.e. KE/q=E*RB/2 (README's "Tracking spot-checks") -- for fixed
+// mass/charge, KE (non-relativistic) scales as p^2, so E1/E2's EFF gets
+// the *square* of the same ratio (see the "Chain" call sites).
+double ComputeMagneticRetuneScale(const ReactionConfig& cfg) {
+  // ReactionConfig's own RTUN card (see ReactionConfig.hh) lets a
+  // reaction file supply an empirically-measured scale -- the recoil's
+  // real, energy-loss-degraded rigidity by the time it reaches D1, not
+  // the idealized vertex value -- exactly the level of refinement
+  // reactions/o15ag_19ne.reaction's own RTUN card gives (measured: mean
+  // 249.4 MeV/c at D1's entrance over 300 --track-reaction events,
+  // against a 258.7 MeV/c idealized vertex value for that reaction's
+  // 19Ne4+ recoil -- see that card's own comment for the exact
+  // reproduction recipe). Without one, fall back to this reaction's own
+  // *idealized* (pre-target-energy-loss) recoil rigidity -- a reasonable
+  // first cut (it's the same rigor dat/dragon_2014_DSSSD.dat's own card
+  // values were originally set to), just not corrected for real energy
+  // loss the way a measured RTUN value is.
+  if (cfg.magneticFieldRetuneScale > 0.0) return cfg.magneticFieldRetuneScale;
 
-MitrayPoleData RetunedQuad(MitrayPoleData d) {
-  d.BQD *= kRetunedRigidityScale;
-  d.BHX *= kRetunedRigidityScale;
-  d.BOC *= kRetunedRigidityScale;
-  d.BDC *= kRetunedRigidityScale;
-  d.BDD *= kRetunedRigidityScale;
+  const ReactionKinematics reaction(cfg);
+  constexpr int kSamples = 2000;  // isotropic emission angle -> converges quickly
+  double sumRecoilMomentumMeV = 0.0;
+  for (int i = 0; i < kSamples; ++i) {
+    sumRecoilMomentumMeV += reaction.GenerateEvent().recoilMomentumMeV.mag();
+  }
+  const double meanRecoilMomentumMeV = sumRecoilMomentumMeV / kSamples;
+
+  // D1's own native per-charge rigidity (p/q = 0.3*B*RB, MeV/c per unit
+  // e) -- the fixed hardware constant every field-strength parameter in
+  // the chain is ultimately scaled relative to (D1 rather than any other
+  // element only because it's the natural "rigidity" reference the
+  // README's own validation already uses).
+  const MitrayDipoleData d1 = MitrayDipoleData::D1();
+  const double nativeRigidityMeVPerCharge = 0.3 * d1.BF * (d1.RB / 100.0) * 1000.0;
+
+  return (meanRecoilMomentumMeV / cfg.recoilChargeState) / nativeRigidityMeVPerCharge;
+}
+
+MitrayPoleData RetunedQuad(MitrayPoleData d, double magneticScale) {
+  d.BQD *= magneticScale;
+  d.BHX *= magneticScale;
+  d.BOC *= magneticScale;
+  d.BDC *= magneticScale;
+  d.BDD *= magneticScale;
   return d;
 }
 
-MitrayDipoleData RetunedDipole(MitrayDipoleData d) {
-  d.BF *= kRetunedRigidityScale;
+MitrayDipoleData RetunedDipole(MitrayDipoleData d, double magneticScale) {
+  d.BF *= magneticScale;
   return d;
 }
 
@@ -151,15 +172,24 @@ MitrayDipoleData RetunedDipole(MitrayDipoleData d) {
 // harder problem -- see the session that derived this comment), but a
 // real, reproducible, nonzero improvement this trim alone is responsible
 // for, not a coincidence of retuning.
+//
+// This ratio is itself scale-invariant, so it does not need
+// re-measuring per reaction: r=p/(qB) at fixed geometric radius is exactly
+// preserved under any simultaneous (p, B) rescaling (the trajectory's own
+// equation of motion, in arc-length parametrization, is unchanged), so a
+// *fractional* field-strength correction that fixes D2's own aberration
+// at one rigidity fixes it at any rigidity -- confirmed directly by
+// deriving this value at 19Ne's own retuned rigidity and separately
+// verifying it reproduces the same <0.01deg residual there.
 constexpr double kD2ResidualTrim = 1.02636;
 
-MitrayDipoleData RetunedD2(MitrayDipoleData d) {
-  d.BF *= kRetunedRigidityScale * kD2ResidualTrim;
+MitrayDipoleData RetunedD2(MitrayDipoleData d, double magneticScale) {
+  d.BF *= magneticScale * kD2ResidualTrim;
   return d;
 }
 
-MitrayEdipoleData RetunedEdipole(MitrayEdipoleData d) {
-  d.EFF *= kRetunedElectricScale;
+MitrayEdipoleData RetunedEdipole(MitrayEdipoleData d, double electricScale) {
+  d.EFF *= electricScale;
   return d;
 }
 
@@ -641,22 +671,41 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     // numbers below refer to that file). 'COLL'/'RCOL' cards are aperture
     // cuts only (zero length); 'TEST'/'FCUP' cards net to zero advance in
     // ugeom_setup and are omitted.
+    // Whichever reaction config file is actually loaded (same
+    // REACTION_INPUT env var convention as main.cc's own
+    // ReactionFilePath(), duplicated here in miniature rather than
+    // shared, since this is the only other call site) drives two things
+    // below: the target chamber's own gas species, and the separator's
+    // field-strength retuning.
+    const char* reactionInputEnv = std::getenv("REACTION_INPUT");
+    const std::string reactionPath =
+        reactionInputEnv ? std::string(reactionInputEnv) : std::string("o15ag_19ne.reaction");
+    const ReactionConfig reactionConfig = ReactionConfig::Load(reactionPath);
+
     // Target chamber + BGO array sit at the world origin -- the beamline's
     // own 'STRV' start (upstream of Q1), where the reaction actually
-    // happens in the real machine. Gas is He, not H2 -- this
-    // configuration's own reaction is 15O(alpha,gamma)19Ne (see
-    // ReactionKinematics.hh/README's "Reaction specification"); a
-    // different DRAGON configuration built around a (p,gamma) reaction
-    // would pass TargetGas::kHydrogen instead.
-    TargetChamber::Build(worldLV, TargetChamber::TargetGas::kHelium);
+    // happens in the real machine. Gas species mirrors src/ugmate_trgt.f's
+    // own rule (atarg<1.2 -> H2, else He) -- not hardcoded, so a (p,gamma)
+    // reaction config (target=1H) gets a hydrogen target chamber instead
+    // of the bundled 15O(alpha,gamma)19Ne config's helium one.
+    const TargetChamber::TargetGas gas = reactionConfig.target.A < 1.2
+                                              ? TargetChamber::TargetGas::kHydrogen
+                                              : TargetChamber::TargetGas::kHelium;
+    TargetChamber::Build(worldLV, gas);
     BgoArray::Build(worldLV);
     G4Material* copper = nist->FindOrBuildMaterial("G4_Cu");  // ugstmed.f medium 5
+
+    // See ComputeMagneticRetuneScale's own comment for the derivation;
+    // electricScale is that same ratio squared (E1/E2's design condition
+    // depends on KE, not p -- see the "Retuning" comment block above).
+    const double magneticScale = ComputeMagneticRetuneScale(reactionConfig);
+    const double electricScale = magneticScale * magneticScale;
 
     ChainState s;
     G4VisAttributes tstVis(G4Colour(0.0, 1.0, 1.0));  // cyan: MCP0/MCP1 markers
     tstVis.SetForceWireframe(true);
 
-    const MitrayPoleData q1data = RetunedQuad(MitrayPoleData::Q1());
+    const MitrayPoleData q1data = RetunedQuad(MitrayPoleData::Q1(), magneticScale);
     const double q1EntryToCentreCm = q1data.A + (q1data.Z22 + q1data.L - q1data.Z11) / 2.0;
     s.xCm = 0.0;
     s.zCm = kQ1CenterZCm - q1EntryToCentreCm;  // Q1's own entry point
@@ -674,13 +723,13 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     // matters (a silent, chain-wide field-masking bug otherwise).
     ChainQuad(s, worldLV, vacuum, "Q1", q1data, 27.5000);         // line 19
     Drift(s, 25.6925);                                   // DF7,  line 32
-    ChainQuad(s, worldLV, vacuum, "Q2", RetunedQuad(MitrayPoleData::Q2()), 27.5000);  // line 35
+    ChainQuad(s, worldLV, vacuum, "Q2", RetunedQuad(MitrayPoleData::Q2(), magneticScale), 27.5000);  // line 35
     Drift(s, 26.4);                                       // DF9,  line 46
     ChainCollimator(s, worldLV, copper, "RC9", true, 0, 0, 7.46, 7.62, 26.4);  // line 47
     Drift(s, 26.4);                                       // DF10, line 50
     Drift(s, 11.0075);                                     // DFA1, line 52
     Shift(s, -0.19107);                                    // SH08, line 54
-    ChainDipole(s, worldLV, vacuum, "D1", RetunedDipole(MitrayDipoleData::D1()), 58.2879);  // line 57
+    ChainDipole(s, worldLV, vacuum, "D1", RetunedDipole(MitrayDipoleData::D1(), magneticScale), 58.2879);  // line 57
 
     Shift(s, 0.19107);                                     // SH09, line 70
     Drift(s, 0.0);                                         // DFA2, line 74
@@ -691,22 +740,22 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     ChainCollimator(s, worldLV, copper, "RC12", true, 0, 0, 4.92, 5.08, 26.55);  // line 84
     Drift(s, 26.55);                                       // DF13, line 87
     Drift(s, 18.32);                                       // DF14, line 90
-    ChainQuad(s, worldLV, vacuum, "Q3", RetunedQuad(MitrayPoleData::Q3()), 21.1025);  // line 95
+    ChainQuad(s, worldLV, vacuum, "Q3", RetunedQuad(MitrayPoleData::Q3(), magneticScale), 21.1025);  // line 95
 
     Drift(s, 0.0);                                         // DF15, line 108
     Drift(s, 16.14);                                       // DF16, line 112
-    ChainQuad(s, worldLV, vacuum, "Q4", RetunedQuad(MitrayPoleData::Q4()), 21.1025);  // line 115
+    ChainQuad(s, worldLV, vacuum, "Q4", RetunedQuad(MitrayPoleData::Q4(), magneticScale), 21.1025);  // line 115
 
     Drift(s, 0.0);                                         // DF17, line 128
     Drift(s, 21.62);                                       // DF18, line 130
-    ChainQuad(s, worldLV, vacuum, "Q5", RetunedQuad(MitrayPoleData::Q5()), 27.5000);  // line 135
+    ChainQuad(s, worldLV, vacuum, "Q5", RetunedQuad(MitrayPoleData::Q5(), magneticScale), 27.5000);  // line 135
 
     Drift(s, 21.62);                                       // DF19, line 148
-    ChainQuad(s, worldLV, vacuum, "Q6", RetunedQuad(MitrayPoleData::Q6()), 21.1025);  // line 153
+    ChainQuad(s, worldLV, vacuum, "Q6", RetunedQuad(MitrayPoleData::Q6(), magneticScale), 21.1025);  // line 153
 
     Drift(s, 0.0);                                         // DF20, line 166
     Drift(s, 16.14);                                       // DF21, line 168
-    ChainQuad(s, worldLV, vacuum, "Q7", RetunedQuad(MitrayPoleData::Q7()), 21.1025);  // line 173
+    ChainQuad(s, worldLV, vacuum, "Q7", RetunedQuad(MitrayPoleData::Q7(), magneticScale), 21.1025);  // line 173
 
     Drift(s, 15.23);                                       // DF22, line 186
     Drift(s, 13.0);                                        // DF23, line 190
@@ -719,7 +768,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Shift(s, -0.0657);                                     // SH23, line 206
     ChainCollimator(s, worldLV, copper, "FC1", false, 0, 0, 5.0, 14.0, 0.875);  // line 207
     Drift(s, 8.875);                                       // FD1,  line 210
-    ChainEdipole(s, worldLV, vacuum, "E1", RetunedEdipole(MitrayEdipoleData::E1()), 49.8623);  // line 213
+    ChainEdipole(s, worldLV, vacuum, "E1", RetunedEdipole(MitrayEdipoleData::E1(), electricScale), 49.8623);  // line 213
 
     Shift(s, 0.0657);                                      // SH24, line 222
     Drift(s, 8.875);                                       // FD2,  line 226
@@ -736,19 +785,19 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 13.5425);                                     // DF30, line 251
     ChainCollimator(s, worldLV, copper, "RC30", true, 0, 0, 4.92, 5.08, 13.5425);  // line 252
     Drift(s, 13.5425);                                     // DF31, line 255
-    ChainQuad(s, worldLV, vacuum, "Q8", RetunedQuad(MitrayPoleData::Q8()), 27.5000);  // line 260
+    ChainQuad(s, worldLV, vacuum, "Q8", RetunedQuad(MitrayPoleData::Q8(), magneticScale), 27.5000);  // line 260
 
     Drift(s, 0.0);                                         // DF33, line 273
     Drift(s, 25.695);                                      // DF34, line 275
-    ChainQuad(s, worldLV, vacuum, "Q9", RetunedQuad(MitrayPoleData::Q9()), 21.2250);  // line 280
+    ChainQuad(s, worldLV, vacuum, "Q9", RetunedQuad(MitrayPoleData::Q9(), magneticScale), 21.2250);  // line 280
 
     Drift(s, 15.81);                                       // DF35, line 293
-    ChainQuad(s, worldLV, vacuum, "Q10", RetunedQuad(MitrayPoleData::Q10()), 21.2250);  // line 298
+    ChainQuad(s, worldLV, vacuum, "Q10", RetunedQuad(MitrayPoleData::Q10(), magneticScale), 21.2250);  // line 298
 
     Drift(s, 9.8);                                         // DF37, line 311
     Drift(s, 26.0);                                        // DF38, line 315
     Drift(s, 9.3);                                         // 'DF',  line 319
-    ChainDipole(s, worldLV, vacuum, "D2", RetunedD2(MitrayDipoleData::D2()), 52.9418);  // line 324
+    ChainDipole(s, worldLV, vacuum, "D2", RetunedD2(MitrayDipoleData::D2(), magneticScale), 52.9418);  // line 324
 
     Drift(s, 56.076);                                      // DF39, line 341
     Drift(s, 6.025);                                       // DF40, line 346
@@ -757,11 +806,11 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 24.992);                                      // DF42, line 354
     ChainCollimator(s, worldLV, copper, "RC42", true, 0, 0, 7.46, 7.62, 24.992);  // line 355
     Drift(s, 24.992);                                      // DF43, line 358
-    ChainQuad(s, worldLV, vacuum, "Q11", RetunedQuad(MitrayPoleData::Q11()), 21.2250);  // line 363
+    ChainQuad(s, worldLV, vacuum, "Q11", RetunedQuad(MitrayPoleData::Q11(), magneticScale), 21.2250);  // line 363
 
     Drift(s, 0.0);                                         // DF43 (2nd), line 376
     Drift(s, 15.81);                                       // DF44, line 378
-    ChainQuad(s, worldLV, vacuum, "Q12", RetunedQuad(MitrayPoleData::Q12()), 21.2250);  // line 383
+    ChainQuad(s, worldLV, vacuum, "Q12", RetunedQuad(MitrayPoleData::Q12(), magneticScale), 21.2250);  // line 383
 
     Drift(s, 15.0);                                        // DF46, line 396
     Drift(s, 13.0);                                        // DF47, line 400
@@ -774,7 +823,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Shift(s, -0.089);                                      // SH43, line 416
     ChainCollimator(s, worldLV, copper, "FC3", false, 0, 0, 5.0, 15.0, 0.875);  // line 417
     Drift(s, 8.875);                                       // FD5,  line 420
-    ChainEdipole(s, worldLV, vacuum, "E2", RetunedEdipole(MitrayEdipoleData::E2()), 85.3127);  // line 423
+    ChainEdipole(s, worldLV, vacuum, "E2", RetunedEdipole(MitrayEdipoleData::E2(), electricScale), 85.3127);  // line 423
 
     Shift(s, 0.089);                                       // SH44, line 432
     Drift(s, 8.875);                                       // FD6,  line 436
@@ -790,10 +839,10 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     ChainCollimator(s, worldLV, copper, "RC55", true, 0, 0, 7.46, 7.62, 12.95);  // line 459
     Drift(s, 12.95);                                       // DF56, line 462
     Drift(s, 12.0);                                        // DF51 (2nd), line 464
-    ChainQuad(s, worldLV, vacuum, "Q13", RetunedQuad(MitrayPoleData::Q13()), 33.3000);  // line 469
+    ChainQuad(s, worldLV, vacuum, "Q13", RetunedQuad(MitrayPoleData::Q13(), magneticScale), 33.3000);  // line 469
 
     Drift(s, 19.9);                                        // DF57, line 482
-    ChainQuad(s, worldLV, vacuum, "Q14", RetunedQuad(MitrayPoleData::Q14()), 33.3000);  // line 487
+    ChainQuad(s, worldLV, vacuum, "Q14", RetunedQuad(MitrayPoleData::Q14(), magneticScale), 33.3000);  // line 487
 
     // Past Q14: the beamline's final stretch to the focal-plane detector.
     // No more bending elements ('DIPO'/'EDIP' cards) appear, so theta is

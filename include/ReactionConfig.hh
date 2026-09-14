@@ -24,6 +24,49 @@
 //                                                  BKIN's depth-sampling to sample
 //                                                  a Breit-Wigner rather than
 //                                                  always firing at exactly ERES.
+//   RTUN  magneticFieldRetuneScale               -- OPTIONAL: overrides the
+//                                                  automatic separator
+//                                                  field-retune scale (see
+//                                                  DetectorConstruction.cc's
+//                                                  "Chain" builder) with an
+//                                                  empirically-measured
+//                                                  one. Every Q1-Q14/D1/D2
+//                                                  field-strength parameter
+//                                                  is scaled by this value
+//                                                  (E1/E2's electric field
+//                                                  by its square, since
+//                                                  electric bending depends
+//                                                  on KE not p) so the
+//                                                  separator's *fixed*
+//                                                  hardware still bends the
+//                                                  recoil by its design
+//                                                  angles at whatever
+//                                                  rigidity this reaction
+//                                                  actually produces. Omit
+//                                                  (or use <=0) to fall
+//                                                  back to computing it from
+//                                                  this reaction's own
+//                                                  idealized (pre-target-
+//                                                  energy-loss) recoil
+//                                                  kinematics -- a
+//                                                  reasonable first cut, but
+//                                                  not corrected for the
+//                                                  real rigidity the recoil
+//                                                  has by the time it
+//                                                  reaches D1 after crossing
+//                                                  the target/pumping chain
+//                                                  (see reactions/
+//                                                  o15ag_19ne.reaction's own
+//                                                  RTUN card for how that
+//                                                  correction is measured:
+//                                                  build, run
+//                                                  `--track-reaction 300`,
+//                                                  average |p| immediately
+//                                                  before D1 over many
+//                                                  events, divide by the
+//                                                  charge state, divide by
+//                                                  D1's own native per-
+//                                                  charge rigidity).
 //   BKIN  beamEntranceKineticEnergyMeV          -- OPTIONAL: the beam's real lab
 //                                                  kinetic energy entering the
 //                                                  gas target. If given (and
@@ -106,6 +149,7 @@ struct ReactionConfig {
   double resonanceEnergyMeV = 0.0;
   double resonanceWidthMeV = 0.0;             // RWID; <=0 means "delta function"
   double beamEntranceKineticEnergyMeV = -1.0;  // BKIN; <=0 means "not given"
+  double magneticFieldRetuneScale = -1.0;      // RTUN; <=0 means "compute automatically"
   std::map<int, Level> levels;  // keyed by level number, 0/-1 not stored here
   std::vector<Branch> branches;
 

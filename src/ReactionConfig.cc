@@ -79,6 +79,11 @@ ReactionConfig ReactionConfig::Load(const std::string& path) {
         throw std::runtime_error("ReactionConfig::Load: '" + path + "': BKIN needs a value");
       }
       cfg.beamEntranceKineticEnergyMeV = std::stod(tok[0]);
+    } else if (card == "RTUN") {
+      if (tok.empty()) {
+        throw std::runtime_error("ReactionConfig::Load: '" + path + "': RTUN needs a value");
+      }
+      cfg.magneticFieldRetuneScale = std::stod(tok[0]);
     } else if (card == "LEVL") {
       if (tok.size() < 3) {
         throw std::runtime_error("ReactionConfig::Load: '" + path +

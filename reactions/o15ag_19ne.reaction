@@ -56,6 +56,22 @@ COMM number (that hasn't been tracked down); replace it with the real
 COMM value if/when known.
 BKIN 2.4813
 COMM
+COMM Separator field-retune scale: overrides the automatic (idealized-
+COMM kinematics) default with this reaction's own real, energy-loss-
+COMM degraded recoil rigidity -- measured empirically (300
+COMM --track-reaction events, real BKIN-vertex-sampled reactions): mean
+COMM |p| = 249.4 MeV/c at D1's own entrance (range 244.1-254.2 MeV/c),
+COMM against the 258.7 MeV/c idealized (pre-target-loss) vertex value
+COMM BeamKineticEnergyMeV()/two-body kinematics alone would give (i.e.
+COMM the automatic default, without this card, comes out within
+COMM statistical noise of 1.0 -- confirmed directly). Reproduce/update:
+COMM build, run `--track-reaction 300 2>&1 | grep '^TRAJ'`, and average
+COMM |p| over every row immediately preceding a "D1"-volume row (mass
+COMM >17000). See DetectorConstruction.cc's "Retuning" comment block for
+COMM how this scale is actually applied (every Q1-Q14/D1/D2 field-
+COMM strength parameter scaled by it directly, E1/E2's by its square).
+RTUN 0.964051024352532
+COMM
 COMM Bound excited states of 19Ne below the resonance that this cascade
 COMM can pass through on its way to the ground state. Level numbers are
 COMM this file's own labels (arbitrary positive integers, need not be in

@@ -1,0 +1,81 @@
+COMM 39K(p,gamma)40Ca, Er(cm)=606 keV resonance -- see this file's own
+COMM per-card comments below for derivations/caveats. Built the same way
+COMM as reactions/o15ag_19ne.reaction: AME mass-excess convention
+COMM throughout (mass = A*amu + massExcessMeV), inverse kinematics (heavy
+COMM 39K beam on a hydrogen gas target, 40Ca recoil).
+COMM
+COMM Mass excesses (MeV, AME2020-ish -- worth checking against a current
+COMM table before using this for real analysis): 39K -33.8072, 1H
+COMM +7.28897, 40Ca -34.8460. These give Q = 8.3278 MeV, matching the
+COMM commonly-cited literature Q-value for this reaction (~8328 keV) to
+COMM better than 1 keV -- a good independent check the masses are right.
+COMM Ex(40Ca) at this resonance = Q + Er = 8.3278 + 0.606 = 8.934 MeV.
+COMM
+COMM Relativistic two-body kinematics (same method as ReactionKinematics,
+COMM replicated standalone to derive this file) give: beam (39K) lab
+COMM kinetic energy on-resonance = 24.035 MeV (0.6163 MeV/u); recoil
+COMM (40Ca) lab kinetic energy ~23.1-23.7 MeV depending on gamma emission
+COMM angle (compound beta=0.0355, so the spread is small), lab momentum
+COMM ~1312-1330 MeV/c.
+COMM
+COMM CAVEATS -- unlike o15ag_19ne.reaction, this file has NOT been
+COMM checked against real spectroscopic/experimental data for the
+COMM specifics below (only the masses/kinematics above, which are
+COMM independent of any of this):
+COMM  - No confirmed decay cascade for the Ex=8.934 MeV state -- BRAT
+COMM    below defaults to 100% direct-to-ground (single gamma), which is
+COMM    a placeholder, not a measured branching ratio. Replace with real
+COMM    LEVL/BRAT cards (see o15ag_19ne.reaction for the format) if the
+COMM    actual cascade is known.
+COMM  - No RWID: this resonance's width isn't filled in here, so every
+COMM    event fires at exactly ERES (a delta function) -- add RWID (CM,
+COMM    MeV) if a measured/adopted width is available.
+COMM  - No BKIN: omitting it keeps the original fixed-vertex behavior
+COMM    (see README's "Beam energy loss through the gas target"); if
+COMM    depth-dependent beam energy loss is wanted, BKIN should be set
+COMM    somewhat above the 24.035 MeV on-resonance beam energy computed
+COMM    above (enough to still be crossing that energy inside the gas),
+COMM    which needs a real stopping-power table for 39K in hydrogen (see
+COMM    --probe-recoil-dedx for the analogous 19Ne-in-target-gas tool --
+COMM    no beam-in-hydrogen equivalent exists yet).
+COMM  - RECL's charge state (8, below) is a rough placeholder from a
+COMM    simple equilibrium-charge-state estimate (Nikolaev-Dmitriev-style
+COMM    scaling at this recoil's beta=0.0355 actually suggests something
+COMM    closer to 14+) -- NOT a measured or separator-matched value the
+COMM    way the bundled 19Ne file's 4+ is (that one was cross-checked
+COMM    against this pilot's own D1/D2/E1/E2 design rigidities). Replace
+COMM    with a real measured/expected charge-state fraction if you have
+COMM    one for 40Ca at ~0.6 MeV/u.
+COMM  - The separator and target gas are now BOTH reaction-driven (no
+COMM    longer hardcoded for 15O(a,g)19Ne -- see DetectorConstruction.cc's
+COMM    "Chain" builder and ComputeMagneticRetuneScale()): the target
+COMM    chamber fills with hydrogen automatically (TARG's own A=1), and
+COMM    every Q1-Q14/D1/D2/E1/E2 field strength is scaled from this
+COMM    reaction's own idealized (pre-target-energy-loss) recoil rigidity
+COMM    (p~1320 MeV/c / q=8 -> p/q~165 MeV/c, vs D1's native 64.68 MeV/c
+COMM    per unit charge -- automatically computed, no RTUN card needed
+COMM    here). Verified: an idealized on-axis particle now bends through
+COMM    D1 (~49.5deg vs 50deg design) and D2 (~73.7deg vs 75deg design)
+COMM    correctly, and real --track-reaction events actually reach the
+COMM    DSSSD (29/200 in one test run) -- something 15O(a,g)19Ne itself
+COMM    only does at the ~1% level even after this session's own D2/field
+COMM    refinement (see git history), because this reaction's kinematic
+COMM    spread happens to be much smaller relative to its own momentum.
+COMM  - What this automatic retuning does NOT do: correct for this
+COMM    reaction's own real, energy-loss-degraded rigidity by the time
+COMM    the recoil reaches D1 (crossing the hydrogen target/pumping
+COMM    chain) -- it only matches the idealized vertex value, exactly the
+COMM    rigor dat/dragon_2014_DSSSD.dat's own original card values had for
+COMM    19Ne before this session's refinement. Add an RTUN card (see
+COMM    ReactionConfig.hh) with the real measured value once known -- same
+COMM    recipe as o15ag_19ne.reaction's own RTUN card comment: build, run
+COMM    `--track-reaction 300`, average |p| immediately before D1 (mass
+COMM    >37000 here) over many events, divide by 8, divide by 64.68.
+
+BEAM 19  39   -33.8072      # Z A massExcessMeV -- 39K
+TARG 1   1    7.28897       # 1H (target, at rest)
+RECL 20  40   -34.8460   8  # 40Ca, placeholder charge state -- see COMM above
+ERES 0.606                  # CM resonance energy above threshold, MeV (606 keV resonance)
+
+BRAT   -1   100.0   0       # resonance (-1) -> ground (0), placeholder 100% direct branch
+SENT
