@@ -10,5 +10,15 @@
 // track loses energy/scatters, not just that it does.
 class SteppingAction : public G4UserSteppingAction {
  public:
+  // nominalChargeIonE: the charge state (in units of e) the tracked ion is
+  // supposed to keep for the whole chain (e.g. 4 for this pilot's 19Ne4+
+  // recoil) -- see UserSteppingAction's own comment for why this has to be
+  // force-reapplied every step. Irrelevant (default 1) for the plain-
+  // proton standalone element tests, which don't hit this bug.
+  explicit SteppingAction(double nominalChargeIonE = 1.0) : fNominalChargeIonE(nominalChargeIonE) {}
+
   void UserSteppingAction(const G4Step* step) override;
+
+ private:
+  double fNominalChargeIonE;
 };

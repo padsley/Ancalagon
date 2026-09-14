@@ -20,6 +20,7 @@
 #include "ReactionConfig.hh"
 #include "ReactionKinematics.hh"
 #include "SteppingAction.hh"
+#include "TargetChamber.hh"
 
 namespace {
 
@@ -253,10 +254,14 @@ G4RunManager* BuildRunManager(const std::string& element, double x0Cm, double y0
     // m/q = 4.758 u/e, i.e. (for q=4e) m = 19.03u -- a 19Ne4+ recoil,
     // consistent with this file's own comments about a 19Ne reaction.
     runManager->SetUserAction(new PrimaryGeneratorAction(x0Cm, y0Cm, pMeV, z0Cm, 10, 19, 4));
+    // See SteppingAction's own comment: without this, G4ionIonisation's
+    // effective-charge model silently drifts this ion's tracked charge
+    // away from its real, fixed 4+ state, corrupting every bend downstream.
+    runManager->SetUserAction(new SteppingAction(4.0));
   } else {
     runManager->SetUserAction(new PrimaryGeneratorAction(x0Cm, y0Cm, pMeV, z0Cm));
+    runManager->SetUserAction(new SteppingAction());
   }
-  runManager->SetUserAction(new SteppingAction());
   runManager->SetUserAction(new RunAction());
   runManager->SetUserAction(new EventAction());
 
@@ -303,11 +308,11 @@ int RunTracking(const std::string& element, int argc, char** argv) {
 }
 
 // Fires real 15O(alpha,gamma)19Ne reaction events (ReactionKinematics.hh)
-// from the target's own vertex (world origin -- TargetChamber places CELL
-// at z=0, see its own comments; the CELL's real y-offset vs. the optics'
-// y=0 beam axis is a pre-existing simplification, not something this mode
-// changes) through the full chain, instead of the fixed design-orbit
-// recoil --track-chain uses.
+// from the target's own vertex (world x=0,z=0, y=TargetChamber's own
+// BeamApertureWorldYCm() -- the line connecting the gas cell's actual
+// EAPG/XAPG entrance/exit apertures, *not* CELL's own geometric center;
+// see that function's own comments) through the full chain, instead of
+// the fixed design-orbit recoil --track-chain uses.
 // Empirically checks a reaction config file's own cascade (see
 // ReactionConfig.hh/ReactionKinematics.hh) by sampling many events with
 // no Geant4 run manager at all -- ReactionKinematics::GenerateEvent()
@@ -343,8 +348,14 @@ int RunReactionTracking(int argc, char** argv) {
 
   runManager->SetUserInitialization(new DetectorConstruction("Chain"));
   runManager->SetUserInitialization(new PhysicsList());
-  runManager->SetUserAction(new PrimaryGeneratorAction(ReactionFilePath(), 0.0, 0.0, 0.0));
-  runManager->SetUserAction(new SteppingAction());
+  runManager->SetUserAction(
+      new PrimaryGeneratorAction(ReactionFilePath(), 0.0, TargetChamber::BeamApertureWorldYCm(), 0.0));
+  // See SteppingAction's own comment: without this, G4ionIonisation's
+  // effective-charge model silently drifts the recoil's tracked charge
+  // away from its real, fixed charge state, corrupting every bend
+  // downstream.
+  runManager->SetUserAction(
+      new SteppingAction(ReactionConfig::Load(ReactionFilePath()).recoilChargeState));
   runManager->SetUserAction(new RunAction());
   runManager->SetUserAction(new EventAction());
   runManager->Initialize();
@@ -371,8 +382,10 @@ int RunVis(int argc, char** argv) {
     runManager = G4RunManagerFactory::CreateRunManager(G4RunManagerType::Serial);
     runManager->SetUserInitialization(new DetectorConstruction("Chain"));
     runManager->SetUserInitialization(new PhysicsList());
-    runManager->SetUserAction(new PrimaryGeneratorAction(ReactionFilePath(), 0.0, 0.0, 0.0));
-    runManager->SetUserAction(new SteppingAction());
+    runManager->SetUserAction(new PrimaryGeneratorAction(ReactionFilePath(), 0.0,
+                                                          TargetChamber::BeamApertureWorldYCm(), 0.0));
+    runManager->SetUserAction(
+        new SteppingAction(ReactionConfig::Load(ReactionFilePath()).recoilChargeState));
     runManager->SetUserAction(new RunAction());
     runManager->SetUserAction(new EventAction());
     runManager->Initialize();

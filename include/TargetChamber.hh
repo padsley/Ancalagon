@@ -63,4 +63,11 @@ enum class TargetGas { kHydrogen, kHelium };
 
 void Build(G4LogicalVolume* worldLV, TargetGas gas);
 
+// World y of the line connecting the EAPG/XAPG beam apertures (the gas
+// cell's real entrance/exit) -- i.e. where a primary vertex must sit for a
+// recoil fired along +z to have any chance of exiting through the cell's
+// actual apertures instead of its solid wall. See TargetChamber.cc's own
+// kApertureLocalZCm/BeamApertureWorldYCm() comments.
+double BeamApertureWorldYCm();
+
 }  // namespace TargetChamber

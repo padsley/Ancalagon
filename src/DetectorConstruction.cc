@@ -207,8 +207,28 @@ void AttachElectric(G4LogicalVolume* lv, G4ElectricField* field) {
 // -- rotating the tube itself is unnecessary extra risk (a classic
 // G4PVPlacement rotation-convention gotcha) for a field container that
 // was already just a bounding volume, not real geometry.
+//
+// maxExtentCm caps the container's half-length/radius (BEFORE that -- the
+// natural (L+Z11+Z22)/2 fringe-margin size -- routinely exceeds the real
+// gap to this element's neighbour, see below): with G4's strict
+// non-overlapping-sibling-volume model, two adjacent field-managed
+// containers that overlap don't "both apply" in the overlap region --
+// Geant4's navigator resolves that whole region to whichever volume it
+// placed first, so the OTHER element's field is silently never applied
+// there at all. Empirically, before this cap existed, 13 of this chain's
+// 18 quad/dipole/e-dipole elements never registered a single step for the
+// design-orbit trajectory (their containers overlapped their upstream
+// neighbour's). The elements themselves can't move -- they're the real,
+// fixed physical arrangement of the separator -- so each cap here is
+// precomputed (offline, from this same chain's own fixed entry/exit
+// geometry) as half the centre-to-centre distance to whichever neighbour
+// is closest, which guarantees zero overlap between any two adjacent
+// containers; see the call sites in Construct() for the actual numbers.
+// This does shrink how much of each element's fringe field is
+// geometrically captured, but every cap here still clears that element's
+// own physical core half-length (data.L/2) with room to spare.
 void ChainQuad(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, const char* name,
-               const MitrayPoleData& data) {
+               const MitrayPoleData& data, double maxExtentCm) {
   const double th = s.thetaDeg * CLHEP::pi / 180.0;
   const double entryToCentreCm = data.A + (data.Z22 + data.L - data.Z11) / 2.0;
   const double centerXCm = s.xCm + entryToCentreCm * std::sin(th);
@@ -217,12 +237,13 @@ void ChainQuad(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, cons
   auto* field =
       new MitrayQuadrupoleField(data, G4ThreeVector(centerXCm, 0.0, centerZCm), s.thetaDeg);
 
-  const double halfLengthCm = (data.L + data.Z11 + data.Z22) / 2.0;
+  const double halfLengthCm = std::min((data.L + data.Z11 + data.Z22) / 2.0, maxExtentCm);
   G4VSolid* solid;
   if (std::abs(s.thetaDeg) < 1.0e-9) {
     solid = new G4Tubs(name, 0.0, data.RAD * cm, halfLengthCm * cm, 0.0, 360.0 * deg);
   } else {
-    const double radiusCm = std::sqrt(data.RAD * data.RAD + halfLengthCm * halfLengthCm) + 2.0;
+    const double radiusCm =
+        std::min(std::sqrt(data.RAD * data.RAD + halfLengthCm * halfLengthCm) + 2.0, maxExtentCm);
     solid = new G4Orb(name, radiusCm * cm);
   }
   auto* lv = new G4LogicalVolume(solid, vacuum, name);
@@ -237,30 +258,49 @@ void ChainQuad(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, cons
 }
 
 // Places a dipole at the chain's current entry point (field origin = the
-// entry point, A-axis aligned to the chain's current theta), then
-// advances the chain to the design-orbit exit point and rotates theta by
-// -PHI for everything downstream. Geometry: a G4Orb of radius RB+50cm
-// centred on the entry point -- big enough to contain the full bend
-// chord (2*RB*sin(PHI/2), at most ~99cm here) plus fringe margin,
-// regardless of theta (see BuildD1/BuildEdipole's box, which this
-// replaces for the same orientation-agnostic reason ChainQuad's does).
+// entry point, A-axis aligned to the chain's current theta, unaffected by
+// anything below -- the physics is keyed off this, not the container),
+// then advances the chain to the design-orbit exit point and rotates
+// theta by -PHI for everything downstream.
+//
+// Container: a G4Orb, but centred on the *arc's own midpoint* (at PHI/2),
+// not the entry point -- unlike a quad, a dipole's container must be big
+// enough to contain its whole bend chord (2*RB*sin(PHI/2)), which for a
+// wide-angle bend like D1's 50 degrees is far bigger than the gap to its
+// nearest neighbour (Q2) if centred at the entry point (the earlier
+// RB+50cm-at-entry-point formula did exactly that, and is exactly why D1
+// swallowed Q2 -- see ChainQuad's own comment on the general problem).
+// Centring at the arc's midpoint instead roughly halves the needed
+// radius for the same chord (RB*sqrt(2*(1-cos(PHI/2))) instead of the
+// full chord), and -- since the midpoint sits further from both this
+// element's neighbours than either endpoint does -- leaves much more of
+// containerRadiusCm's own margin for the aperture width and fringe decay
+// beyond the idealized zero-width arc. containerRadiusCm is precomputed
+// the same way as ChainQuad's maxExtentCm (that formula plus a margin,
+// further capped to at most half the centre-to-centre distance to
+// whichever neighbour is closest to the midpoint) -- see the call sites.
 void ChainDipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, const char* name,
-                 const MitrayDipoleData& data) {
+                 const MitrayDipoleData& data, double containerRadiusCm) {
   const double th = s.thetaDeg * CLHEP::pi / 180.0;
   const double originXCm = s.xCm, originZCm = s.zCm;
 
   auto* field =
       new MitrayDipoleField(data, G4ThreeVector(originXCm, 0.0, originZCm), s.thetaDeg);
 
-  const double radiusCm = data.RB + 50.0;
-  auto* solid = new G4Orb(name, radiusCm * cm);
+  const double phiRad = data.PHI * CLHEP::pi / 180.0;
+  const double halfPhiRad = 0.5 * phiRad;
+  const double midXLocalCm = -data.RB * (1.0 - std::cos(halfPhiRad));
+  const double midZLocalCm = data.RB * std::sin(halfPhiRad);
+  const double midXCm = originXCm + std::cos(th) * midXLocalCm + std::sin(th) * midZLocalCm;
+  const double midZCm = originZCm - std::sin(th) * midXLocalCm + std::cos(th) * midZLocalCm;
+
+  auto* solid = new G4Orb(name, containerRadiusCm * cm);
   auto* lv = new G4LogicalVolume(solid, vacuum, name);
   lv->SetVisAttributes(kDipoleVis);
-  new G4PVPlacement(nullptr, G4ThreeVector(originXCm * cm, 0.0, originZCm * cm), lv, name, worldLV,
-                     false, 0, true);
+  new G4PVPlacement(nullptr, G4ThreeVector(midXCm * cm, 0.0, midZCm * cm), lv, name, worldLV, false,
+                     0, true);
   AttachMagnetic(lv, field);
 
-  const double phiRad = data.PHI * CLHEP::pi / 180.0;
   const double exitXLocalCm = -data.RB * (1.0 - std::cos(phiRad));
   const double exitZLocalCm = data.RB * std::sin(phiRad);
   s.xCm = originXCm + std::cos(th) * exitXLocalCm + std::sin(th) * exitZLocalCm;
@@ -270,24 +310,30 @@ void ChainDipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, co
 
 // Same pattern as ChainDipole(), for an electrostatic deflector (also
 // bends the design trajectory by PHI along a radius-RB arc -- verified
-// empirically in the standalone E1/E2 pilots).
+// empirically in the standalone E1/E2 pilots). Same arc-midpoint
+// container centring and precomputed containerRadiusCm cap, same reason.
 void ChainEdipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, const char* name,
-                  const MitrayEdipoleData& data) {
+                  const MitrayEdipoleData& data, double containerRadiusCm) {
   const double th = s.thetaDeg * CLHEP::pi / 180.0;
   const double originXCm = s.xCm, originZCm = s.zCm;
 
   auto* field =
       new MitrayEdipoleField(data, G4ThreeVector(originXCm, 0.0, originZCm), s.thetaDeg);
 
-  const double radiusCm = data.RB + 50.0;
-  auto* solid = new G4Orb(name, radiusCm * cm);
+  const double phiRad = data.PHI * CLHEP::pi / 180.0;
+  const double halfPhiRad = 0.5 * phiRad;
+  const double midXLocalCm = -data.RB * (1.0 - std::cos(halfPhiRad));
+  const double midZLocalCm = data.RB * std::sin(halfPhiRad);
+  const double midXCm = originXCm + std::cos(th) * midXLocalCm + std::sin(th) * midZLocalCm;
+  const double midZCm = originZCm - std::sin(th) * midXLocalCm + std::cos(th) * midZLocalCm;
+
+  auto* solid = new G4Orb(name, containerRadiusCm * cm);
   auto* lv = new G4LogicalVolume(solid, vacuum, name);
   lv->SetVisAttributes(kEdipoleVis);
-  new G4PVPlacement(nullptr, G4ThreeVector(originXCm * cm, 0.0, originZCm * cm), lv, name, worldLV,
-                     false, 0, true);
+  new G4PVPlacement(nullptr, G4ThreeVector(midXCm * cm, 0.0, midZCm * cm), lv, name, worldLV, false,
+                     0, true);
   AttachElectric(lv, field);
 
-  const double phiRad = data.PHI * CLHEP::pi / 180.0;
   const double exitXLocalCm = -data.RB * (1.0 - std::cos(phiRad));
   const double exitZLocalCm = data.RB * std::sin(phiRad);
   s.xCm = originXCm + std::cos(th) * exitXLocalCm + std::sin(th) * exitZLocalCm;
@@ -467,15 +513,22 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     // Sanity-check against the values published in the header/README.
     static_assert(kChainD1EntryZCm > 185.0 && kChainD1EntryZCm < 186.0, "check derivation");
 
-    ChainQuad(s, worldLV, vacuum, "Q1", q1data);         // line 19
+    // The maxExtentCm/containerRadiusCm arguments below (ChainQuad's 5th,
+    // ChainDipole/ChainEdipole's 6th) are precomputed offline from this
+    // same chain's own fixed geometry: half the centre-to-centre distance
+    // to whichever neighbour is closest (arc midpoint for a dipole/
+    // e-dipole, see ChainDipole's own comment), so no two adjacent field
+    // containers can overlap. See ChainQuad's comment for why this
+    // matters (a silent, chain-wide field-masking bug otherwise).
+    ChainQuad(s, worldLV, vacuum, "Q1", q1data, 27.5000);         // line 19
     Drift(s, 25.6925);                                   // DF7,  line 32
-    ChainQuad(s, worldLV, vacuum, "Q2", MitrayPoleData::Q2());  // line 35
+    ChainQuad(s, worldLV, vacuum, "Q2", MitrayPoleData::Q2(), 27.5000);  // line 35
     Drift(s, 26.4);                                       // DF9,  line 46
     ChainCollimator(s, worldLV, copper, "RC9", true, 0, 0, 7.46, 7.62, 26.4);  // line 47
     Drift(s, 26.4);                                       // DF10, line 50
     Drift(s, 11.0075);                                     // DFA1, line 52
     Shift(s, -0.19107);                                    // SH08, line 54
-    ChainDipole(s, worldLV, vacuum, "D1", MitrayDipoleData::D1());  // line 57
+    ChainDipole(s, worldLV, vacuum, "D1", MitrayDipoleData::D1(), 58.2879);  // line 57
 
     Shift(s, 0.19107);                                     // SH09, line 70
     Drift(s, 0.0);                                         // DFA2, line 74
@@ -486,22 +539,22 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     ChainCollimator(s, worldLV, copper, "RC12", true, 0, 0, 4.92, 5.08, 26.55);  // line 84
     Drift(s, 26.55);                                       // DF13, line 87
     Drift(s, 18.32);                                       // DF14, line 90
-    ChainQuad(s, worldLV, vacuum, "Q3", MitrayPoleData::Q3());  // line 95
+    ChainQuad(s, worldLV, vacuum, "Q3", MitrayPoleData::Q3(), 21.1025);  // line 95
 
     Drift(s, 0.0);                                         // DF15, line 108
     Drift(s, 16.14);                                       // DF16, line 112
-    ChainQuad(s, worldLV, vacuum, "Q4", MitrayPoleData::Q4());  // line 115
+    ChainQuad(s, worldLV, vacuum, "Q4", MitrayPoleData::Q4(), 21.1025);  // line 115
 
     Drift(s, 0.0);                                         // DF17, line 128
     Drift(s, 21.62);                                       // DF18, line 130
-    ChainQuad(s, worldLV, vacuum, "Q5", MitrayPoleData::Q5());  // line 135
+    ChainQuad(s, worldLV, vacuum, "Q5", MitrayPoleData::Q5(), 27.5000);  // line 135
 
     Drift(s, 21.62);                                       // DF19, line 148
-    ChainQuad(s, worldLV, vacuum, "Q6", MitrayPoleData::Q6());  // line 153
+    ChainQuad(s, worldLV, vacuum, "Q6", MitrayPoleData::Q6(), 21.1025);  // line 153
 
     Drift(s, 0.0);                                         // DF20, line 166
     Drift(s, 16.14);                                       // DF21, line 168
-    ChainQuad(s, worldLV, vacuum, "Q7", MitrayPoleData::Q7());  // line 173
+    ChainQuad(s, worldLV, vacuum, "Q7", MitrayPoleData::Q7(), 21.1025);  // line 173
 
     Drift(s, 15.23);                                       // DF22, line 186
     Drift(s, 13.0);                                        // DF23, line 190
@@ -514,7 +567,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Shift(s, -0.0657);                                     // SH23, line 206
     ChainCollimator(s, worldLV, copper, "FC1", false, 0, 0, 5.0, 14.0, 0.875);  // line 207
     Drift(s, 8.875);                                       // FD1,  line 210
-    ChainEdipole(s, worldLV, vacuum, "E1", MitrayEdipoleData::E1());  // line 213
+    ChainEdipole(s, worldLV, vacuum, "E1", MitrayEdipoleData::E1(), 49.8623);  // line 213
 
     Shift(s, 0.0657);                                      // SH24, line 222
     Drift(s, 8.875);                                       // FD2,  line 226
@@ -531,19 +584,19 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 13.5425);                                     // DF30, line 251
     ChainCollimator(s, worldLV, copper, "RC30", true, 0, 0, 4.92, 5.08, 13.5425);  // line 252
     Drift(s, 13.5425);                                     // DF31, line 255
-    ChainQuad(s, worldLV, vacuum, "Q8", MitrayPoleData::Q8());  // line 260
+    ChainQuad(s, worldLV, vacuum, "Q8", MitrayPoleData::Q8(), 27.5000);  // line 260
 
     Drift(s, 0.0);                                         // DF33, line 273
     Drift(s, 25.695);                                      // DF34, line 275
-    ChainQuad(s, worldLV, vacuum, "Q9", MitrayPoleData::Q9());  // line 280
+    ChainQuad(s, worldLV, vacuum, "Q9", MitrayPoleData::Q9(), 21.2250);  // line 280
 
     Drift(s, 15.81);                                       // DF35, line 293
-    ChainQuad(s, worldLV, vacuum, "Q10", MitrayPoleData::Q10());  // line 298
+    ChainQuad(s, worldLV, vacuum, "Q10", MitrayPoleData::Q10(), 21.2250);  // line 298
 
     Drift(s, 9.8);                                         // DF37, line 311
     Drift(s, 26.0);                                        // DF38, line 315
     Drift(s, 9.3);                                         // 'DF',  line 319
-    ChainDipole(s, worldLV, vacuum, "D2", MitrayDipoleData::D2());  // line 324
+    ChainDipole(s, worldLV, vacuum, "D2", MitrayDipoleData::D2(), 52.9418);  // line 324
 
     Drift(s, 56.076);                                      // DF39, line 341
     Drift(s, 6.025);                                       // DF40, line 346
@@ -552,11 +605,11 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 24.992);                                      // DF42, line 354
     ChainCollimator(s, worldLV, copper, "RC42", true, 0, 0, 7.46, 7.62, 24.992);  // line 355
     Drift(s, 24.992);                                      // DF43, line 358
-    ChainQuad(s, worldLV, vacuum, "Q11", MitrayPoleData::Q11());  // line 363
+    ChainQuad(s, worldLV, vacuum, "Q11", MitrayPoleData::Q11(), 21.2250);  // line 363
 
     Drift(s, 0.0);                                         // DF43 (2nd), line 376
     Drift(s, 15.81);                                       // DF44, line 378
-    ChainQuad(s, worldLV, vacuum, "Q12", MitrayPoleData::Q12());  // line 383
+    ChainQuad(s, worldLV, vacuum, "Q12", MitrayPoleData::Q12(), 21.2250);  // line 383
 
     Drift(s, 15.0);                                        // DF46, line 396
     Drift(s, 13.0);                                        // DF47, line 400
@@ -569,7 +622,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Shift(s, -0.089);                                      // SH43, line 416
     ChainCollimator(s, worldLV, copper, "FC3", false, 0, 0, 5.0, 15.0, 0.875);  // line 417
     Drift(s, 8.875);                                       // FD5,  line 420
-    ChainEdipole(s, worldLV, vacuum, "E2", MitrayEdipoleData::E2());  // line 423
+    ChainEdipole(s, worldLV, vacuum, "E2", MitrayEdipoleData::E2(), 85.3127);  // line 423
 
     Shift(s, 0.089);                                       // SH44, line 432
     Drift(s, 8.875);                                       // FD6,  line 436
@@ -585,10 +638,10 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     ChainCollimator(s, worldLV, copper, "RC55", true, 0, 0, 7.46, 7.62, 12.95);  // line 459
     Drift(s, 12.95);                                       // DF56, line 462
     Drift(s, 12.0);                                        // DF51 (2nd), line 464
-    ChainQuad(s, worldLV, vacuum, "Q13", MitrayPoleData::Q13());  // line 469
+    ChainQuad(s, worldLV, vacuum, "Q13", MitrayPoleData::Q13(), 33.3000);  // line 469
 
     Drift(s, 19.9);                                        // DF57, line 482
-    ChainQuad(s, worldLV, vacuum, "Q14", MitrayPoleData::Q14());  // line 487
+    ChainQuad(s, worldLV, vacuum, "Q14", MitrayPoleData::Q14(), 33.3000);  // line 487
 
     // Past Q14: the beamline's final stretch to the focal-plane detector.
     // No more bending elements ('DIPO'/'EDIP' cards) appear, so theta is

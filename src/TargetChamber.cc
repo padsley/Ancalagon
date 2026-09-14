@@ -60,10 +60,39 @@ constexpr double kWall2 = 0.3175;       // WALL(2), dragon_2003.ffcards
 constexpr double kColLength = 15.24;
 constexpr double kColCollarLength = 0.0;  // never assigned in this file's active path
 constexpr double kBoxHeight = 20.0;
-constexpr double kBeamHeightCm = -kBoxHeight / 2.0 + 3.171;  // CMBR's own y-offset in DETE
 
-// CELL's y-offset inside CMBG (ugeo_detector, targtype==0 branch):
+// CELL's y-offset inside CMBG (ugeo_detector, targtype==0 branch): CELL's
+// real position relative to its own box, kept as derived from the original
+// GEANT3 model (CELL's own local half-length along this axis, after
+// CellRotation(), is 4.208 cm -- moving CELL itself further from CMBG's
+// center than this would push it into CMBG's wall, see CMBG's own
+// half-height below).
 constexpr double kCellYInCmbgCm = 0.5 * kBoxHeight - 4.208 - 0.976;
+
+// CMBR's own y-offset in DETE (ugeo_detector's own DETE placement formula).
+// Combined with kCellYInCmbgCm (4.816 cm), this puts CELL's own *geometric
+// center* at world y = -2.013 cm -- which looks like it's off the optics'
+// y=0 beam axis (see RunAction.hh/main.cc's own older comments on this).
+// It isn't a bug: CELL's own center is not the same as the actual
+// beam/recoil path through it, which runs through EAPG/XAPG (its own
+// entrance/exit apertures, off-center by kApertureLocalZCm -- see below).
+// This -6.829 value is tuned, together with kCellYInCmbgCm and
+// kApertureLocalZCm, to put THAT path (BeamApertureWorldYCm(), below) on
+// the y=0 axis -- UHOL/DHOL (placed at local y = -kBeamHeightCm inside
+// CMBR, below) confirm this: they stay pinned to world y=0 regardless of
+// this constant's value, and were already on y=0 before anything in this
+// file was touched, meaning CELL's center being off-axis was always the
+// intended, self-consistent design, not a simplification to fix.
+constexpr double kBeamHeightCm = -kBoxHeight / 2.0 + 3.171;
+
+// EAPG/XAPG (CellAndApertures(), below) -- the gas cell's actual entrance/
+// exit apertures -- sit at local z = kApertureLocalZCm, not CELL's own
+// local z=0 (its geometric center). A primary vertex placed at CELL's
+// center (as this pilot's PrimaryGeneratorAction previously was) fires a
+// recoil almost straight along local x (world z, see CellRotation()) but
+// 2.008 cm below the actual apertures -- it runs into CELL's solid wall
+// after ~3.9 cm instead of ever reaching them. See BeamApertureWorldYCm().
+constexpr double kApertureLocalZCm = 2.008;
 
 G4Material* BuildGas(const char* name, TargetChamber::TargetGas gas, double pressureFractionOfAtm) {
   G4NistManager* nist = G4NistManager::Instance();
@@ -150,19 +179,22 @@ void CellAndApertures(G4LogicalVolume* cmbgLV, TargetChamber::TargetGas gas) {
 
   // EAPG/XAPG: mtarg-gas TUBE beam apertures bored through CELL's slanted
   // side wall (tubetype==0 radii: EAPG rmax=0.3cm, XAPG rmax=0.4cm; both
-  // half-length 0.5cm), at local z=+-5.315cm, y=0.
+  // half-length 0.5cm), at local x=+-5.315cm, z=kApertureLocalZCm, y=0 --
+  // i.e. the real beam/recoil path through this cell is the line
+  // (x varies, y=0, z=kApertureLocalZCm), not CELL's own local z=0 (see
+  // BeamApertureWorldYCm() below).
   G4RotationMatrix* colRot = EapgXapgRotation();
   auto* eapgSolid = new G4Tubs("EAPG", 0.0, 0.3 * cm, 0.5 * cm, 0.0, 360.0 * deg);
   auto* eapgLV = new G4LogicalVolume(eapgSolid, targetGas, "EAPG");
   eapgLV->SetVisAttributes(G4VisAttributes(G4Colour(0.6, 0.6, 1.0, 0.4)));
-  new G4PVPlacement(colRot, G4ThreeVector(5.315 * cm, 0.0, 2.008 * cm), eapgLV, "EAPG", cellLV,
-                     false, 0, true);
+  new G4PVPlacement(colRot, G4ThreeVector(5.315 * cm, 0.0, kApertureLocalZCm * cm), eapgLV, "EAPG",
+                     cellLV, false, 0, true);
 
   auto* xapgSolid = new G4Tubs("XAPG", 0.0, 0.4 * cm, 0.5 * cm, 0.0, 360.0 * deg);
   auto* xapgLV = new G4LogicalVolume(xapgSolid, targetGas, "XAPG");
   xapgLV->SetVisAttributes(G4VisAttributes(G4Colour(0.6, 0.6, 1.0, 0.4)));
-  new G4PVPlacement(colRot, G4ThreeVector(-5.315 * cm, 0.0, 2.008 * cm), xapgLV, "XAPG", cellLV,
-                     false, 0, true);
+  new G4PVPlacement(colRot, G4ThreeVector(-5.315 * cm, 0.0, kApertureLocalZCm * cm), xapgLV, "XAPG",
+                     cellLV, false, 0, true);
 
   // CELL's placement inside CMBG (see kCellYInCmbgCm above).
   new G4PVPlacement(CellRotation(), G4ThreeVector(0.0, kCellYInCmbgCm * cm, 0.0), cellLV, "CELL",
@@ -534,4 +566,15 @@ void TargetChamber::Build(G4LogicalVolume* worldLV, TargetGas gas) {
   G4LogicalVolume* cmbgLV = OuterBoxAndShielding(worldLV, gas);
   CellAndApertures(cmbgLV, gas);
   DifferentialPumpingChain(worldLV, gas);
+}
+
+double TargetChamber::BeamApertureWorldYCm() {
+  // See kApertureLocalZCm's own comment: CELL's local z=kApertureLocalZCm
+  // maps, through CellRotation(), to world +y (see CellAndApertures()'s
+  // EAPG/XAPG placements); CELL's own placement inside CMBG/CMBR
+  // (kCellYInCmbgCm + kBeamHeightCm) puts its *center* at this same world y
+  // plus kApertureLocalZCm. A primary vertex meant to fire recoils down the
+  // gas cell's real (aperture-to-aperture) path belongs at this world y,
+  // not at CELL's own center (world y = kCellYInCmbgCm + kBeamHeightCm).
+  return kCellYInCmbgCm + kBeamHeightCm + kApertureLocalZCm;
 }
