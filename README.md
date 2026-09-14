@@ -800,6 +800,7 @@ cd ../build
 ./dragon_g4_pilot --track-chain  0.0 0.0 258.7 1     # ALL 18 elements, 19Ne4+ on design orbit
 ./dragon_g4_pilot --track-reaction 5          # ALL 18 elements, real 15O(a,g)19Ne events (nEvents only)
 ./dragon_g4_pilot --reaction-stats            # sanity-check the reaction file's own cascade (no G4RunManager)
+./dragon_g4_pilot --probe-recoil-dedx         # 19Ne stopping power in the target gas, MeV/cm and MeV/(mg/cm^2)
 
 # Visualization (see "Visualization" above)
 ./dragon_g4_pilot --vis Chain                # interactive

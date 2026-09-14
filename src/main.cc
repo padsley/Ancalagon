@@ -7,6 +7,9 @@
 #include "DetectorConstruction.hh"
 #include "EventAction.hh"
 #include "RunAction.hh"
+#include "G4EmCalculator.hh"
+#include "G4IonTable.hh"
+#include "G4Material.hh"
 #include "G4RunManagerFactory.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4UIExecutive.hh"
@@ -269,6 +272,39 @@ G4RunManager* BuildRunManager(const std::string& element, double x0Cm, double y0
   return runManager;
 }
 
+// 19Ne recoil stopping power in the target gas, via the *same*
+// G4EmCalculator/PhysicsList physics this pilot already uses for both
+// real tracking and GasStoppingPower's beam vertex-depth table -- not an
+// independently-sourced number. Reported both in MeV/cm and the
+// mass-stopping-power convention MeV/(mg/cm^2), over the recoil's own
+// actual kinetic-energy range (see README's "Reaction specification":
+// ~1.9 MeV at production, degrading as it crosses the target/pumping
+// chain). Cross-checks against the recoil's already-documented ~0.197 MeV
+// loss crossing the ~9.9cm CELG target cell: dE/dx(~1.7 MeV) * CELG's own
+// areal density (density here * 9.9cm) lands right on that figure.
+int RunRecoilDedxProbe() {
+  auto* runManager = BuildRunManager("Chain", 0.0, 0.0, 258.7, -120.0);
+  // BeamOn(0): forces G4 to finish building cuts/couples for every placed
+  // material (including TargetGas) -- Initialize() alone isn't enough;
+  // G4EmCalculator::GetDEDX() throws G4Exception em0078 ("FindCouple:
+  // fail for material") without this.
+  runManager->BeamOn(0);
+  G4Material* gas = G4Material::GetMaterial(TargetChamber::TargetGasMaterialName());
+  G4ParticleDefinition* ion = G4IonTable::GetIonTable()->GetIon(10, 19, 0.0);
+  G4EmCalculator calc;
+  const double densityMgPerCm3 = gas->GetDensity() / (mg / cm3);
+  std::printf("TargetGas density: %.6f mg/cm^3\n", densityMgPerCm3);
+  const double kes[] = {2.0, 1.9, 1.8, 1.7, 1.6, 1.5, 1.4, 1.3, 1.2, 1.0, 0.8};
+  for (double keMeV : kes) {
+    const double dEdxMeVPerCm = calc.GetDEDX(keMeV * MeV, ion, gas) / (MeV / cm);
+    const double dEdxMeVPerMgCm2 = dEdxMeVPerCm / densityMgPerCm3;
+    std::printf("KE=%.2f MeV: dE/dx = %.6f MeV/cm = %.6f MeV/(mg/cm^2)\n", keMeV, dEdxMeVPerCm,
+                dEdxMeVPerMgCm2);
+  }
+  delete runManager;
+  return 0;
+}
+
 double DefaultZ0Cm(const std::string& element) {
   if (element == "D1") return -140.0;
   if (element == "E1") return -220.0;  // outside E1's +-250cm bounding box
@@ -496,6 +532,9 @@ int main(int argc, char** argv) {
   }
   if (argc > 1 && std::strcmp(argv[1], "--track-beam") == 0) {
     return RunBeamThroughTarget(argc, argv);
+  }
+  if (argc > 1 && std::strcmp(argv[1], "--probe-recoil-dedx") == 0) {
+    return RunRecoilDedxProbe();
   }
   if (argc > 1 && std::strcmp(argv[1], "--reaction-stats") == 0) {
     return RunReactionStats(argc, argv);
