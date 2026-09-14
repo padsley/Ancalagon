@@ -14,7 +14,6 @@
 #include "G4Mag_UsualEqRhs.hh"
 #include "G4Material.hh"
 #include "G4NistManager.hh"
-#include "G4Orb.hh"
 #include "G4PVPlacement.hh"
 #include "G4PhysicalConstants.hh"
 #include "G4RotationMatrix.hh"
@@ -241,12 +240,11 @@ void Shift(ChainState& s, double dxCm) {
   s.zCm -= dxCm * std::sin(th);
 }
 
-// Placement rotation for real (non-field-container) geometry that must
-// stay aligned to the local beam axis after a bend -- unlike the quad/
-// dipole/edipole field containers (G4Orb, orientation-agnostic on
-// purpose, see ChainQuad's comment), a collimator's aperture is real
-// absorbing geometry: get its orientation wrong past D1/E1/D2/E2 and the
-// beam clips the wrong material or misses the aperture entirely. Builds
+// Placement rotation shared by every rotated volume past a bend -- real
+// absorbing geometry (collimators) and the quad/dipole/edipole field
+// containers alike, now that none of them fall back to an orientation-
+// agnostic G4Orb any more (see ChainQuad's/ChainDipole's own comments for
+// why that mattered for correctness, not just looks). Builds
 // the inverse of RotateAboutY.hh's local->world active rotation (world =
 // R(theta)*local) via CLHEP's rotateAxes(...) taking that rotation's own
 // ROWS (same "pass rows for the inverse" trick already used in
@@ -345,16 +343,16 @@ void ChainQuad(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, cons
 // then advances the chain to the design-orbit exit point and rotates
 // theta by -PHI for everything downstream.
 //
-// Container: a G4Orb, but centred on the *arc's own midpoint* (at PHI/2),
-// not the entry point -- unlike a quad, a dipole's container must be big
-// enough to contain its whole bend chord (2*RB*sin(PHI/2)), which for a
-// wide-angle bend like D1's 50 degrees is far bigger than the gap to its
-// nearest neighbour (Q2) if centred at the entry point (the earlier
-// RB+50cm-at-entry-point formula did exactly that, and is exactly why D1
-// swallowed Q2 -- see ChainQuad's own comment on the general problem).
-// Centring at the arc's midpoint instead roughly halves the needed
-// radius for the same chord (RB*sqrt(2*(1-cos(PHI/2))) instead of the
-// full chord), and -- since the midpoint sits further from both this
+// Container: a chord-aligned G4Box, centred on the *arc's own midpoint*
+// (at PHI/2), not the entry point -- unlike a quad, a dipole's container
+// must be big enough to contain its whole bend chord (2*RB*sin(PHI/2)),
+// which for a wide-angle bend like D1's 50 degrees is far bigger than the
+// gap to its nearest neighbour (Q2) if centred at the entry point (the
+// earlier RB+50cm-at-entry-point formula did exactly that, and is exactly
+// why D1 swallowed Q2 -- see ChainQuad's own comment on the general
+// problem). Centring at the arc's midpoint instead roughly halves the
+// needed reach for the same chord (RB*sqrt(2*(1-cos(PHI/2))) instead of
+// the full chord), and -- since the midpoint sits further from both this
 // element's neighbours than either endpoint does -- leaves much more of
 // containerRadiusCm's own margin for the aperture width and fringe decay
 // beyond the idealized zero-width arc. containerRadiusCm is precomputed
@@ -376,10 +374,29 @@ void ChainDipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, co
   const double midXCm = originXCm + std::cos(th) * midXLocalCm + std::sin(th) * midZLocalCm;
   const double midZCm = originZCm - std::sin(th) * midXLocalCm + std::cos(th) * midZLocalCm;
 
-  auto* solid = new G4Orb(name, containerRadiusCm * cm);
+  // Chord-aligned box instead of an orientation-agnostic sphere. The
+  // straight chord from entry to exit bisects the bend angle exactly (a
+  // circular arc's standard chord/tangent identity -- also confirmed
+  // directly from ChainDipole's own exit-point formula below), so its
+  // world-frame direction is just the entry theta minus half of PHI;
+  // BeamAxisRotation() at that angle is the same helper/convention
+  // ChainQuad/ChainCollimator already validate, just evaluated at the
+  // bisector instead of the post-bend angle. Half-length along the chord
+  // reuses containerRadiusCm as-is (the same precomputed, neighbour-
+  // overlap-safe reach the sphere used); the transverse/vertical
+  // half-extents come from the field's own aperture (WDIP1/WDIP2, D)
+  // plus a flat margin for the arc's sagitta and fringe falloff, each
+  // still capped at containerRadiusCm so this can only shrink the sphere's
+  // old footprint, never grow it.
+  const double chordThetaDeg = s.thetaDeg - data.PHI / 2.0;
+  G4RotationMatrix* rot = BeamAxisRotation(chordThetaDeg);
+  const double halfWidthCm =
+      std::min(std::max(data.WDIP1, data.WDIP2) / 2.0 + 10.0, containerRadiusCm);
+  const double halfHeightCm = std::min(data.D / 2.0 + 10.0, containerRadiusCm);
+  auto* solid = new G4Box(name, halfWidthCm * cm, halfHeightCm * cm, containerRadiusCm * cm);
   auto* lv = new G4LogicalVolume(solid, vacuum, name);
   lv->SetVisAttributes(kDipoleVis);
-  new G4PVPlacement(nullptr, G4ThreeVector(midXCm * cm, 0.0, midZCm * cm), lv, name, worldLV, false,
+  new G4PVPlacement(rot, G4ThreeVector(midXCm * cm, 0.0, midZCm * cm), lv, name, worldLV, false,
                      0, true);
   AttachMagnetic(lv, field);
 
@@ -393,7 +410,11 @@ void ChainDipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, co
 // Same pattern as ChainDipole(), for an electrostatic deflector (also
 // bends the design trajectory by PHI along a radius-RB arc -- verified
 // empirically in the standalone E1/E2 pilots). Same arc-midpoint
-// container centring and precomputed containerRadiusCm cap, same reason.
+// container centring, same chord-aligned box in place of the old sphere
+// (see ChainDipole's comment) -- MitrayEdipoleData has no separate
+// WDIP1/WDIP2, D itself is the deflector's own horizontal aperture bound
+// (MitrayEdipoleField::FieldInLocalCm's xbmax/xcmax), so it stands in for
+// both the transverse and vertical half-extent here.
 void ChainEdipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, const char* name,
                   const MitrayEdipoleData& data, double containerRadiusCm) {
   const double th = s.thetaDeg * CLHEP::pi / 180.0;
@@ -409,10 +430,14 @@ void ChainEdipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, c
   const double midXCm = originXCm + std::cos(th) * midXLocalCm + std::sin(th) * midZLocalCm;
   const double midZCm = originZCm - std::sin(th) * midXLocalCm + std::cos(th) * midZLocalCm;
 
-  auto* solid = new G4Orb(name, containerRadiusCm * cm);
+  const double chordThetaDeg = s.thetaDeg - data.PHI / 2.0;
+  G4RotationMatrix* rot = BeamAxisRotation(chordThetaDeg);
+  const double halfWidthCm = std::min(data.D / 2.0 + 10.0, containerRadiusCm);
+  const double halfHeightCm = halfWidthCm;
+  auto* solid = new G4Box(name, halfWidthCm * cm, halfHeightCm * cm, containerRadiusCm * cm);
   auto* lv = new G4LogicalVolume(solid, vacuum, name);
   lv->SetVisAttributes(kEdipoleVis);
-  new G4PVPlacement(nullptr, G4ThreeVector(midXCm * cm, 0.0, midZCm * cm), lv, name, worldLV, false,
+  new G4PVPlacement(rot, G4ThreeVector(midXCm * cm, 0.0, midZCm * cm), lv, name, worldLV, false,
                      0, true);
   AttachElectric(lv, field);
 
@@ -471,25 +496,25 @@ void ChainMarker(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, co
 // checking is deliberately off for these four placements only; it stays
 // on for placement against everything else in the chain.
 //
-// Past a bend (theta!=0) this geometry -- unlike a quad/dipole/edipole
-// field container -- must actually track the local beam axis (see
-// BeamAxisRotation's own comment), so every placement here carries a
-// real rotation, not the orientation-agnostic G4Orb shortcut the field
-// containers use. offsetXCm/offsetYCm are the card's own DATA(2)/DATA(3)
-// (always 0 in this file, but ported for fidelity to ugeo_col's own
-// GTRMUL offset, not hardcoded).
+// Past a bend (theta!=0) this geometry, like the quad/dipole/edipole
+// field containers, must track the local beam axis (see BeamAxisRotation's
+// own comment), so every placement here carries a real rotation.
+// offsetXCm/offsetYCm are the card's own DATA(2)/DATA(3) (always 0 in
+// this file, but ported for fidelity to ugeo_col's own GTRMUL offset, not
+// hardcoded).
 //
 // Expect (and this is not a placement bug): with pCheckOverlaps on, a
-// handful of these -- and of the quad/dipole/edipole orbs themselves --
-// report overlapping D1/E1/E2/D2's own field-container spheres. Those
-// spheres are deliberately huge (RB+50cm -- 150-300cm radius, see
-// ChainDipole/ChainEdipole) to contain a bend from any angle; a real
-// collimator only ~15-50cm away (typical drift spacing in this file)
-// falls well inside one by simple geometry (verified by hand for RC12
-// against D1's 150cm sphere: ~139cm from centre, comfortably inside).
-// Harmless for the same reason the sphere containers themselves are: no
-// physics process (this pilot's list is transportation-only) resolves a
-// material boundary yet, so nothing tracks differently for it.
+// handful of these -- 16 in the current "Chain" build, e.g. E1/E2's own
+// containers each overlapping one neighbouring collimator -- still report
+// overlapping a quad/dipole/edipole field container. That's unavoidable
+// given how tightly this beamline is packed (containerRadiusCm is itself
+// capped to half the centre-to-centre distance to the *nearest* neighbour,
+// so a container reaching that far can still catch a collimator sitting
+// off to one side rather than directly ahead); switching those containers
+// from spheres to chord-aligned boxes (see ChainDipole's/ChainQuad's own
+// comments) only shrinks this set, never grows it. Harmless regardless:
+// these containers are vacuum field volumes with no real material
+// boundary for a physics process to resolve differently at the overlap.
 void ChainCollimator(const ChainState& s, G4LogicalVolume* worldLV, G4Material* copper,
                       const char* name, bool isCircular, double offsetXCm, double offsetYCm,
                       double dataXCm, double dataYCm, double halfZCm, double magnification = 1.0) {
