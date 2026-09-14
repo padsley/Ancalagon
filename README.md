@@ -382,13 +382,24 @@ gas path); its `BKIN`, however, is a value chosen to put that depth at the
 target's own geometric midpoint, not a historical DRAGON beam-tune number
 (not tracked down) -- see the file's own comments.
 
+**Beam energy-loss straggling**: `GasStoppingPower` also accumulates
+Bohr's classical Gaussian straggling variance alongside the mean dE/dx
+(valid for the many-collision regime this dilute, several-cm gas path is
+in, not the thin-absorber Landau/Vavilov regime), so each event's
+depth-crossing energy is perturbed by a Gaussian sample at that variance
+before re-finding the depth a real ion reaches it at -- i.e. the vertex
+depth this pilot's own bundled reaction file now produces has a real,
+physical spread (measured: ~3.5 mm, out of the ~10.6 cm target), not
+just the delta-function-narrow spread the resonance's own width alone
+would give. One known simplification: the Bohr formula's own projectile
+charge is taken as the bare Z, not G4's internally-modeled effective
+charge (which the mean dE/dx from `G4EmCalculator` does already use) --
+see `GasStoppingPower.hh`'s own comment.
+
 **Scope**: vertex kinematics only -- the whole chain is treated as
 instantaneous at the reaction vertex (no separate tracking of an excited
 intermediate recoil's own brief flight before its next decay), no angular
-distributions/correlations anywhere in the chain, no energy-loss
-*straggling* (the statistical spread around the mean energy loss
-`GasStoppingPower` computes -- Bohr/Landau-type fluctuations are not
-modeled, only the mean `G4EmCalculator` dE/dx), and the recoil's charge
+distributions/correlations anywhere in the chain, and the recoil's charge
 state is fixed at whatever the config file's own `RECL` card gives (4+
 for this pilot's own reaction), not sampled from a real charge-state
 distribution. `PrimaryGeneratorAction`'s reaction-file constructor fires

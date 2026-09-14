@@ -1,5 +1,7 @@
 #include "PrimaryGeneratorAction.hh"
 
+#include <algorithm>
+
 #include "G4Event.hh"
 #include "G4Gamma.hh"
 #include "G4IonTable.hh"
@@ -11,6 +13,7 @@
 #include "G4SystemOfUnits.hh"
 #include "G4ThreeVector.hh"
 #include "GasStoppingPower.hh"
+#include "Randomize.hh"
 #include "ReactionConfig.hh"
 #include "TargetChamber.hh"
 
@@ -86,7 +89,24 @@ void PrimaryGeneratorAction::GenerateReactionPrimaries(G4Event* event) {
     }
     beamKineticEnergyMeV = fReaction->SampleBeamKineticEnergyMeV(
         fStoppingPower->ExitKineticEnergyMeV(), fStoppingPower->EntranceKineticEnergyMeV());
-    const double depthCm = fStoppingPower->DepthForKineticEnergyCm(beamKineticEnergyMeV);
+    const double meanDepthCm = fStoppingPower->DepthForKineticEnergyCm(beamKineticEnergyMeV);
+
+    // Straggling (see GasStoppingPower's own header comment): the mean
+    // dE/dx curve alone says every ion of the same entrance energy
+    // reaches beamKineticEnergyMeV at exactly meanDepthCm -- real energy
+    // loss is a statistical process, so a real ion actually reaches it
+    // at a depth that fluctuates around that mean. Model this by
+    // perturbing the *depth-crossing* energy (not the reaction's own
+    // kinematics, which stay at the Breit-Wigner-sampled
+    // beamKineticEnergyMeV above -- that's still the energy the reaction
+    // itself happens at) by a Gaussian sample with Bohr's straggling
+    // sigma at that depth, then re-finding the depth a real ion reaches
+    // *that* energy at.
+    const double sigmaMeV = fStoppingPower->StragglingSigmaMeV(meanDepthCm);
+    double straggledKeMeV = beamKineticEnergyMeV + G4RandGauss::shoot(0.0, sigmaMeV);
+    straggledKeMeV = std::min(std::max(straggledKeMeV, fStoppingPower->ExitKineticEnergyMeV()),
+                               fStoppingPower->EntranceKineticEnergyMeV());
+    const double depthCm = fStoppingPower->DepthForKineticEnergyCm(straggledKeMeV);
     vertexZCm = -TargetChamber::BeamPathHalfLengthCm() + depthCm;
   }
 
