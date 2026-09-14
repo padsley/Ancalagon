@@ -113,6 +113,51 @@ MitrayDipoleData RetunedDipole(MitrayDipoleData d) {
   return d;
 }
 
+// D2-specific empirical trim, on top of the rigidity retuning above.
+//
+// Tracing an idealized on-axis particle (zero spread, exactly the
+// self-consistent rigidity for its own field strength) through the whole
+// chain shows every element within its already-documented ~0.1-0.2deg
+// per-element precision (D1: 0.13deg, E1: 0.06deg, every quad <=0.23deg)
+// -- except D2, whose own bend angle undershoots its 75deg design PHI by
+// 2.06deg, 15-25x every other element's residual, with the box-container
+// geometry above (worse still, 3.10deg, with the old sphere -- so this
+// isn't a container-shape artifact) and unchanged at 1000x tighter
+// chord-finder accuracy (so it isn't a numerical-integration artifact
+// either). D2's field values are themselves independently bit-exact
+// against the real, unmodified GEANT3 Fortran (see README's "Field
+// grids" validation) -- the discrepancy isn't a porting bug in the field
+// formula, so this doesn't get "fixed" there. The most likely
+// explanation is that the underlying MIT-RAYTRACE analytic field model
+// (a 3rd-order paraxial expansion) is simply less accurate for D2's much
+// more extreme geometry than D1's -- PHI=75deg vs D1's 50deg, and
+// critically ALPHA=BETA=29deg vs D1's 5.8deg (a much larger pole-face
+// wedge angle) -- an inherent limitation of the 1970s-era model itself,
+// not something introduced by this port.
+//
+// D2's placement is physically fixed (real, immovable hardware), so the
+// only lever available is its own field strength -- exactly how a real
+// operator would compensate a magnet that's known to under-deliver its
+// nominal bend for a given current. kD2ResidualTrim is that compensation:
+// empirically found (a couple of iterations of the same idealized-on-axis
+// trace this comment describes) to bring D2's own bend angle to within
+// 0.001deg of exactly 75deg for the retuned rigidity above -- i.e. it
+// corrects D2's own aberration, not a second independent retuning for
+// momentum. Verified effective: the same idealized on-axis particle that
+// previously died at RC42 (unretuned) or FC3 (retuned, before this trim)
+// now reaches the DSSSD cleanly; over 500 real --track-reaction events,
+// DSSSD transmission goes from 0/500 to 4/500 -- modest, because QSLT/MSLT
+// still clip the bulk of events on real momentum spread (a separate,
+// harder problem -- see the session that derived this comment), but a
+// real, reproducible, nonzero improvement this trim alone is responsible
+// for, not a coincidence of retuning.
+constexpr double kD2ResidualTrim = 1.02636;
+
+MitrayDipoleData RetunedD2(MitrayDipoleData d) {
+  d.BF *= kRetunedRigidityScale * kD2ResidualTrim;
+  return d;
+}
+
 MitrayEdipoleData RetunedEdipole(MitrayEdipoleData d) {
   d.EFF *= kRetunedElectricScale;
   return d;
@@ -703,7 +748,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 9.8);                                         // DF37, line 311
     Drift(s, 26.0);                                        // DF38, line 315
     Drift(s, 9.3);                                         // 'DF',  line 319
-    ChainDipole(s, worldLV, vacuum, "D2", RetunedDipole(MitrayDipoleData::D2()), 52.9418);  // line 324
+    ChainDipole(s, worldLV, vacuum, "D2", RetunedD2(MitrayDipoleData::D2()), 52.9418);  // line 324
 
     Drift(s, 56.076);                                      // DF39, line 341
     Drift(s, 6.025);                                       // DF40, line 346
