@@ -296,7 +296,10 @@ int RunTracking(const std::string& element, int argc, char** argv) {
   const double x0Cm = argc > 2 ? std::atof(argv[2]) : 1.0;
   const double y0Cm = argc > 3 ? std::atof(argv[3]) : 0.0;
   const double pMeV = argc > 4 ? std::atof(argv[4]) : DefaultMomentumMeV(element);
-  const double z0Cm = DefaultZ0Cm(element);
+  // Optional 7th CLI arg overrides the firing z-position -- lets a single
+  // element (e.g. Q1, D1) be probed in isolation by starting the design
+  // trajectory right at its own entrance instead of always at z=0.
+  const double z0Cm = argc > 6 ? std::atof(argv[6]) : DefaultZ0Cm(element);
 
   auto* runManager = BuildRunManager(element, x0Cm, y0Cm, pMeV, z0Cm);
 
