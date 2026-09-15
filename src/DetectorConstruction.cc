@@ -740,6 +740,24 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     const char* msltHalfGapEnv = std::getenv("MSLT_HALFGAP_X_CM");
     const double msltHalfGapXCm = msltHalfGapEnv ? std::atof(msltHalfGapEnv) : 0.75;
 
+    // Same override again, for MSLT's non-dispersive (Y) half-aperture --
+    // real card value 1.25cm (same call site). Defaults to the real value,
+    // so omitting it changes nothing.
+    const char* msltHalfGapYEnv = std::getenv("MSLT_HALFGAP_Y_CM");
+    const double msltHalfGapYCm = msltHalfGapYEnv ? std::atof(msltHalfGapYEnv) : 1.25;
+
+    // Same diagnostic override, for the charge slit's (QSLT) own dispersive
+    // (X) half-aperture -- real card value 1.25cm (see the "QSLT" call site
+    // below). Defaults to the real value, so omitting it changes nothing.
+    const char* qsltHalfGapEnv = std::getenv("QSLT_HALFGAP_X_CM");
+    const double qsltHalfGapXCm = qsltHalfGapEnv ? std::atof(qsltHalfGapEnv) : 1.25;
+
+    // Same override again, for QSLT's non-dispersive (Y) half-aperture --
+    // real card value 1.25cm too (same call site). Defaults to the real
+    // value, so omitting it changes nothing.
+    const char* qsltHalfGapYEnv = std::getenv("QSLT_HALFGAP_Y_CM");
+    const double qsltHalfGapYCm = qsltHalfGapYEnv ? std::atof(qsltHalfGapYEnv) : 1.25;
+
     // Target chamber + BGO array sit at the world origin -- the beamline's
     // own 'STRV' start (upstream of Q1), where the reaction actually
     // happens in the real machine. Gas species mirrors src/ugmate_trgt.f's
@@ -799,7 +817,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Shift(s, 0.19107);                                     // SH09, line 70
     Drift(s, 0.0);                                         // DFA2, line 74
     Drift(s, 30.79);                                       // DF11, line 76
-    ChainCollimator(s, worldLV, copper, "QSLT", false, 0, 0, 1.25, 1.25, 0.025, 20.0);  // line 77 (charge slit)
+    ChainCollimator(s, worldLV, copper, "QSLT", false, 0, 0, qsltHalfGapXCm, qsltHalfGapYCm, 0.025, 20.0);  // line 77 (charge slit; QSLT_HALFGAP_X_CM/QSLT_HALFGAP_Y_CM override the real 1.25/1.25cm values -- see above)
     Drift(s, 3.9);                                         // DF12, line 80
     Drift(s, 22.65);                                       // DFAA, line 83
     ChainCollimator(s, worldLV, copper, "RC12", true, 0, 0, 4.92, 5.08, 26.55);  // line 84
@@ -842,7 +860,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 47.625);                                      // DF27, line 232
     ChainCollimator(s, worldLV, copper, "RC27", true, 0, 0, 4.92, 6.96, 47.625);  // line 233
     Drift(s, 47.625);                                      // DF28 (1st), line 236
-    ChainCollimator(s, worldLV, copper, "MSLT", false, 0, 0, msltHalfGapXCm, 1.25, 0.025, 10.0);  // line 237 (mass slit; MSLT_HALFGAP_X_CM overrides the real 0.75cm value -- see above)
+    ChainCollimator(s, worldLV, copper, "MSLT", false, 0, 0, msltHalfGapXCm, msltHalfGapYCm, 0.025, 10.0);  // line 237 (mass slit; MSLT_HALFGAP_X_CM/MSLT_HALFGAP_Y_CM override the real 0.75/1.25cm values -- see above)
     Drift(s, 3.6);                                         // DF28 (2nd), line 243
     Drift(s, 22.9);                                        // DFBB, line 245
     ChainCollimator(s, worldLV, copper, "RC28", true, 0, 0, 4.92, 5.08, 26.8);  // line 246
