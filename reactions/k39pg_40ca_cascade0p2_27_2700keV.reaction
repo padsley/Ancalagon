@@ -1,0 +1,64 @@
+COMM 39K(p,gamma)40Ca two-step gamma cascade scan TERMINATING AT THE REAL
+COMM 0+_2 STATE (~3352-3353 keV, the well-known 4p-4h intruder/deformed
+COMM -band-head state), not the true ground state -- file 27 of 54.
+COMM
+COMM WHY: 0+_2 -> 0+ (ground) is a 0+ -> 0+ transition, forbidden for
+COMM single-photon (E1/M1/E2/...) emission by angular-momentum/parity
+COMM selection rules -- real 40Ca's 0+_2 state decays almost entirely by
+COMM E0 conversion (internal conversion electrons / e+e- pairs), NOT an
+COMM observable gamma ray a BGO array would ever see. Modeling this
+COMM state's own further decay as a gamma (the way every LEVL/BRAT level
+COMM normally works in this pilot) would be physically wrong, so this
+COMM file instead treats the 0+_2 state itself as the cascade's own
+COMM terminus ("level 0" in the LEVL/BRAT sense below), and simply never
+COMM tracks its unobservable further decay to true ground at all.
+COMM
+COMM HOW: RECL's own massExcess below is NOT 40Ca's true ground-state
+COMM value (-34.8460 MeV, see k39pg_40ca.reaction) -- it's shifted up by
+COMM the 0+_2 state's own 3.3526 MeV excitation, to -31.4934 MeV. This is
+COMM deliberate, not an error: ReactionKinematics.cc's own
+COMM BeamKineticEnergyMeVForEcm() derives the compound resonance's
+COMM invariant mass purely from BEAM+TARG+ERES, never from RECL's own
+COMM mass -- so this shift does not touch the beam-energy/threshold
+COMM physics at all (still exactly this reaction's real 8.3278 MeV
+COMM Q-value + 0.606 MeV Er = 8.93377 MeV resonance excitation above the
+COMM TRUE ground state). It only changes what "reaching level 0" means
+COMM for the cascade below: every LEVL excitation here is already
+COMM "energy above the 0+_2 state", so this scan's own 100 keV minimum
+COMM (the user's own request) falls out directly as LEVL 1's own 0.1 MeV
+COMM starting value, with no extra arithmetic needed. (The ~0.009%
+COMM difference this makes to the recoil ion's own simulated momentum --
+COMM via the LAST cascade step's daughter mass -- is utterly negligible;
+COMM PrimaryGeneratorAction fires the recoil using G4IonTable's own real
+COMM ground-state 40Ca mass regardless, only the momentum *vector* comes
+COMM from this file's kinematics.)
+COMM
+COMM Resonance's own excitation above the 0+_2 state: Ex_true - E(0+_2) =
+COMM 8.93377 - 3.3526 = 5.58117 MeV. This series steps one
+COMM intermediate level's excitation (above the 0+_2 state) from
+COMM 0.1 MeV to (that - 0.1 MeV) = 5.48117 MeV in 0.1 MeV
+COMM steps -- file NN puts it at NN*0.1 MeV above the 0+_2 state.
+COMM
+COMM THIS FILE: intermediate level at 2.7000 MeV above the 0+_2 state
+COMM -- gamma-cascade energies (before recoil-kinematics corrections):
+COMM gamma1 = 5.58117 - 2.7000 = 2.8812 MeV (resonance ->
+COMM intermediate), gamma2 = 2.7000 MeV (intermediate -> the 0+_2
+COMM state -- an ordinary, observable gamma, since the 0+_2 state itself
+COMM is only the *final* transition's daughter, not its own parent).
+COMM Every event emits exactly two gammas (100% two-step branching) --
+COMM verify with `--reaction-stats <this file>`.
+COMM
+COMM The intermediate level's lifetime below is a placeholder (1e-12 s),
+COMM fictional like the level itself and unused by the kinematics (see
+COMM ReactionConfig.hh's own LEVL card comment).
+
+BEAM 19  39   -33.8072      # Z A massExcessMeV -- 39K
+TARG 1   1    7.28897       # 1H (target, at rest)
+RECL 20  40   -31.4934   8  # 40Ca -- massExcess SHIFTED to the 0+_2 state; see COMM above
+ERES 0.606                  # CM resonance energy above threshold, MeV (unaffected by the RECL shift)
+
+LEVL   1   2.7000   1.0E-12   # fictional intermediate level, above the 0+_2 state (scan step 27/54)
+
+BRAT   -1  100.0   1        # resonance -> intermediate, 100%
+BRAT    1  100.0   0        # intermediate -> the 0+_2 state ("ground" in this file), 100%
+SENT
