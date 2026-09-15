@@ -1,11 +1,28 @@
 #include "SteppingAction.hh"
 
 #include <cstdio>
+#include <cstdlib>
 
 #include "G4Step.hh"
 #include "G4SystemOfUnits.hh"
 #include "G4Track.hh"
 #include "G4VPhysicalVolume.hh"
+
+namespace {
+// TRAJ_QUIET=1 suppresses the per-step "TRAJ ..." dump below (unset/0
+// keeps it, the long-standing default every diagnostic mode used earlier
+// relies on). Checked once (std::getenv on every one of potentially
+// hundreds of millions of steps in a bulk production run would itself be
+// wasteful) via a function-local static -- not a per-instance flag, since
+// every SteppingAction in a single process shares the same environment.
+bool TrajQuiet() {
+  static const bool quiet = [] {
+    const char* v = std::getenv("TRAJ_QUIET");
+    return v && v[0] == '1';
+  }();
+  return quiet;
+}
+}  // namespace
 
 void SteppingAction::UserSteppingAction(const G4Step* step) {
   G4Track* track = step->GetTrack();
@@ -31,6 +48,8 @@ void SteppingAction::UserSteppingAction(const G4Step* step) {
     // access, just from user code instead of a process.
     const_cast<G4DynamicParticle*>(track->GetDynamicParticle())->SetCharge(fNominalChargeIonE * eplus);
   }
+
+  if (TrajQuiet()) return;
 
   const G4ThreeVector pos = track->GetPosition();
   const G4ThreeVector mom = track->GetMomentum();

@@ -8,6 +8,14 @@
 // edep were added once real EM physics existed (see README's "Sensitive
 // detectors"/"Full chain" caveat) specifically to localize *where* a
 // track loses energy/scatters, not just that it does.
+//
+// TRAJ_QUIET=1 (env var, see the .cc) suppresses this dump entirely --
+// for bulk/production runs (e.g. many high-statistics --track-reaction
+// batches) where only the ROOT ntuple output (RunAction/EventAction)
+// matters and this dump would otherwise dominate both runtime and disk
+// usage for no benefit. The ion-charge fixup below (see
+// UserSteppingAction's own comment) still runs regardless -- that part is
+// real physics, not diagnostics.
 class SteppingAction : public G4UserSteppingAction {
  public:
   // nominalChargeIonE: the charge state (in units of e) the tracked ion is
