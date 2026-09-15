@@ -205,6 +205,38 @@ MitrayDipoleData RetunedD2(MitrayDipoleData d, double magneticScale) {
   return d;
 }
 
+// E1/E2's own retune scale -- NOT simply magneticScale^2 in general (see
+// the caller's own comment). dat/dragon_2014_DSSSD.dat's whole beamline
+// was carded for a 19Ne4+ recoil at 258.7 MeV/c (README's "Reaction
+// specification") -- kDesignRecoilMassMeV/kDesignRecoilChargeState are
+// that ion's own real ground-state mass (AME mass-excess convention, same
+// formula ReactionKinematics uses: A*amu + massExcessMeV, from
+// reactions/o15ag_19ne.reaction's own RECL card) and charge state, not
+// this pilot's invention. For a recoil of a *different* mass and/or
+// charge state than that (e.g. 40Ca, in reactions/k39pg_40ca.reaction),
+// the correction below is required: KE/q (what E1/E2's own design
+// condition, qE=mv^2/RB, actually constrains) does NOT scale the same way
+// magnetic rigidity p/q does when mass differs, since
+// KE = p^2/(2m) -- confirmed empirically (see the session that found
+// this: a --track-reaction charge-state scan for k39pg_40ca showed E1's
+// own bend angle drifting smoothly from -28deg to -9.5deg against its
+// 20deg design as the assigned recoil charge state ran 5->16, even though
+// every element's *magnetic* retuning was already correct for each
+// charge's own rigidity -- only charge 8 (this reaction's actual
+// production charge state, coincidentally close to the ~8.4 value that
+// makes the old magneticScale^2 shortcut accidentally near-correct) looked
+// fine). The correction factor below is exactly 1 when mass/charge match
+// the original 19Ne4+ design (reactions/o15ag_19ne.reaction), so this is
+// not a behavior change for that reaction -- only for any other one.
+constexpr double kDesignRecoilMassMeV = 19 * 931.49432 + 1.7511;  // 19Ne ground state
+constexpr int kDesignRecoilChargeState = 4;                       // 19Ne4+
+
+double ComputeElectricRetuneScale(const ReactionConfig& cfg, double magneticScale) {
+  const double recoilMassMeV = ReactionKinematics(cfg).RecoilGroundMassMeV();
+  return magneticScale * magneticScale * (kDesignRecoilMassMeV / recoilMassMeV) *
+         (static_cast<double>(cfg.recoilChargeState) / kDesignRecoilChargeState);
+}
+
 MitrayEdipoleData RetunedEdipole(MitrayEdipoleData d, double electricScale) {
   d.EFF *= electricScale;
   return d;
@@ -699,6 +731,15 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
         reactionInputEnv ? std::string(reactionInputEnv) : std::string("o15ag_19ne.reaction");
     const ReactionConfig reactionConfig = ReactionConfig::Load(reactionPath);
 
+    // Diagnostic-only override of the mass slit's (MSLT) own dispersive
+    // (X) half-aperture -- real card value 0.75cm (see the "MSLT" call
+    // site below) -- for studying how much of the mass-slit's own
+    // transmission loss is the aperture itself vs. everything upstream of
+    // it. Not a real hardware parameter this pilot would otherwise expose;
+    // defaults to the real value, so omitting it changes nothing.
+    const char* msltHalfGapEnv = std::getenv("MSLT_HALFGAP_X_CM");
+    const double msltHalfGapXCm = msltHalfGapEnv ? std::atof(msltHalfGapEnv) : 0.75;
+
     // Target chamber + BGO array sit at the world origin -- the beamline's
     // own 'STRV' start (upstream of Q1), where the reaction actually
     // happens in the real machine. Gas species mirrors src/ugmate_trgt.f's
@@ -713,18 +754,17 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     G4Material* copper = nist->FindOrBuildMaterial("G4_Cu");  // ugstmed.f medium 5
 
     // fMagneticRetuneScaleOverride (see DetectorConstruction.hh) lets a
-    // caller inject an already-resolved scale -- main.cc's "Chain"-building
-    // entry points always do (ResolveChainMagneticRetuneScale() there
-    // measures the real, energy-loss-degraded value rather than settling
-    // for ComputeMagneticRetuneScale's own idealized fallback). <=0 (only
-    // reachable if some future call site forgets to resolve one) falls
-    // back to that same old behavior. electricScale is that ratio squared
-    // either way (E1/E2's design condition depends on KE, not p -- see the
-    // "Retuning" comment block above).
+    // caller inject an already-resolved scale -- main.cc's reaction-driven
+    // entry points always do (SetUpRetunedChainGeometry() there measures
+    // the real, energy-loss-degraded value rather than settling for
+    // ComputeMagneticRetuneScale's own idealized fallback). <=0 (only
+    // reachable if some other call site doesn't resolve one) falls back to
+    // that same old behavior. electricScale is NOT simply this squared in
+    // general -- see ComputeElectricRetuneScale's own comment.
     const double magneticScale = (fMagneticRetuneScaleOverride > 0.0)
                                       ? fMagneticRetuneScaleOverride
                                       : ComputeMagneticRetuneScale(reactionConfig);
-    const double electricScale = magneticScale * magneticScale;
+    const double electricScale = ComputeElectricRetuneScale(reactionConfig, magneticScale);
 
     ChainState s;
     G4VisAttributes tstVis(G4Colour(0.0, 1.0, 1.0));  // cyan: MCP0/MCP1 markers
@@ -802,7 +842,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 47.625);                                      // DF27, line 232
     ChainCollimator(s, worldLV, copper, "RC27", true, 0, 0, 4.92, 6.96, 47.625);  // line 233
     Drift(s, 47.625);                                      // DF28 (1st), line 236
-    ChainCollimator(s, worldLV, copper, "MSLT", false, 0, 0, 0.75, 1.25, 0.025, 10.0);  // line 237 (mass slit)
+    ChainCollimator(s, worldLV, copper, "MSLT", false, 0, 0, msltHalfGapXCm, 1.25, 0.025, 10.0);  // line 237 (mass slit; MSLT_HALFGAP_X_CM overrides the real 0.75cm value -- see above)
     Drift(s, 3.6);                                         // DF28 (2nd), line 243
     Drift(s, 22.9);                                        // DFBB, line 245
     ChainCollimator(s, worldLV, copper, "RC28", true, 0, 0, 4.92, 5.08, 26.8);  // line 246

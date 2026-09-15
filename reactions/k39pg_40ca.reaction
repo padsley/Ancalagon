@@ -71,13 +71,29 @@ COMM --track-reaction events reaching D1), against ERES/kinematics'
 COMM idealized (pre-target-energy-loss) vertex value of ~1320 MeV/c -- only
 COMM a ~0.7% correction (this reaction's kinematic spread is much smaller
 COMM relative to its own momentum than 15O(a,g)19Ne's, per the "no RTUN
-COMM card needed" note this replaced), but still nearly doubles DSSSD
-COMM transmission at the mass slit (MSLT, a narrow +-1.25cm dispersive
-COMM focus just past E1): 2000 --track-reaction events measured 226/2000
-COMM (11.3%) reaching the DSSSD at the idealized-only scale, 440/2000
-COMM (22.0%) at this measured one -- MSLT and its upstream collimator RC27
-COMM still account for ~76% of all losses either way (this correction
-COMM narrows the mismatch at that slit, it doesn't eliminate it).
+COMM card needed" note this replaced). This value is a pure D1-rigidity
+COMM measurement (mean |p| at D1's entrance, divided by charge and by D1's
+COMM own native rigidity) -- unaffected by a since-fixed E1/E2 retuning bug
+COMM (see below), so it did not need remeasuring when that bug was found.
+COMM
+COMM DSSSD transmission (2000 --track-reaction events): 18.3% (366/2000)
+COMM with this RTUN value, essentially all of the loss at the mass slit
+COMM (MSLT, a narrow +-1.25cm dispersive focus just past E1, split ~evenly
+COMM between its two jaws -- 41.3%/36.2%). An EARLIER version of this
+COMM comment quoted 22.0% and blamed RC27 for ~1/4 of the loss -- that
+COMM number was measured before a bug in DetectorConstruction.cc's
+COMM ComputeElectricRetuneScale (then just `electricScale =
+COMM magneticScale^2`) was found and fixed: that formula is only correct
+COMM when the recoil's mass and charge state match the original 19Ne4+
+COMM hardware design exactly (true for o15ag_19ne.reaction, not for this
+COMM 40Ca recoil at charge 8+), so E1/E2 were mistuned by a few percent
+COMM here (confirmed: E1's own bend angle was 20.9deg against a 20deg
+COMM design, vs <0.1deg once fixed) -- enough to leak some flux through
+COMM RC27 that a correctly-tuned E1 no longer does. See the git history
+COMM for the full derivation (a --track-reaction charge-state scan that
+COMM found E1's bend angle drifting from -28deg to -9.5deg across
+COMM assigned charge states 5-16 before the fix, and landing on a uniform
+COMM ~19.91deg for all of them afterward).
 RTUN 2.533954
 
 BEAM 19  39   -33.8072      # Z A massExcessMeV -- 39K

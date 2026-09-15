@@ -487,10 +487,40 @@ int RunRecoilDedxProbe() {
   // fail for material") without this.
   runManager->BeamOn(0);
   G4Material* gas = G4Material::GetMaterial(TargetChamber::TargetGasMaterialName());
-  G4ParticleDefinition* ion = G4IonTable::GetIonTable()->GetIon(10, 19, 0.0);
+
+  // Material-identity check: is "TargetGas" (see TargetChamber.cc's
+  // NistNameFor()) really representing molecular gas (H2/He), not, say,
+  // atomic/solid hydrogen? Density and the ICRU mean excitation energy
+  // (I-value) both distinguish these -- NIST's own "G4_H" entry (what
+  // BuildGas() scales from) is defined as gaseous H2 (I=19.2eV, density
+  // 8.3748e-05 g/cm3 at NTP -- ICRU37's own H2-gas value, not atomic H's
+  // ~14.995eV/solid-H2's ~21.8eV), which is what should print below.
+  std::printf("--- TargetGas material identity ---\n");
+  std::printf("State: %s\n", gas->GetState() == kStateGas ? "gas" : "NOT gas (unexpected)");
+  std::printf("Density: %.6e g/cm^3 (%.6f mg/cm^3)\n", gas->GetDensity() / (g / cm3),
+              gas->GetDensity() / (mg / cm3));
+  std::printf("Mean excitation energy (I-value): %.4f eV\n",
+              gas->GetIonisation()->GetMeanExcitationEnergy() / eV);
+  std::printf("Composition: %d element(s)\n", (int)gas->GetNumberOfElements());
+  for (size_t i = 0; i < gas->GetNumberOfElements(); ++i) {
+    const G4Element* el = gas->GetElement(i);
+    std::printf("  %s (Z=%.0f), mass fraction=%.4f, atoms/volume=%.6e /cm^3\n",
+                el->GetName().c_str(), el->GetZ(), gas->GetFractionVector()[i],
+                gas->GetVecNbOfAtomsPerVolume()[i] / (1.0 / cm3));
+  }
+  std::printf("\n");
+
+  // dE/dx probe: the reaction's OWN recoil ion (not hardcoded to 19Ne), so
+  // this works for whichever reaction REACTION_INPUT points to (e.g.
+  // k39pg_40ca.reaction's 40Ca8+ in H2, not just the bundled 19Ne-in-He
+  // case).
+  const ReactionConfig cfg = ReactionConfig::Load(ReactionFilePath());
+  G4ParticleDefinition* ion =
+      G4IonTable::GetIonTable()->GetIon(cfg.recoil.Z, cfg.recoil.A, 0.0);
   G4EmCalculator calc;
   const double densityMgPerCm3 = gas->GetDensity() / (mg / cm3);
-  std::printf("TargetGas density: %.6f mg/cm^3\n", densityMgPerCm3);
+  std::printf("--- dE/dx for Z=%d A=%d recoil (charge %d+) in TargetGas ---\n", cfg.recoil.Z,
+              cfg.recoil.A, cfg.recoilChargeState);
   const double kes[] = {2.0, 1.9, 1.8, 1.7, 1.6, 1.5, 1.4, 1.3, 1.2, 1.0, 0.8};
   for (double keMeV : kes) {
     const double dEdxMeVPerCm = calc.GetDEDX(keMeV * MeV, ion, gas) / (MeV / cm);

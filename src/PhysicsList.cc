@@ -1,6 +1,10 @@
 #include "PhysicsList.hh"
 
+#include <cstdlib>
+#include <cstring>
+
 #include "G4EmStandardPhysics.hh"
+#include "G4EmStandardPhysics_option4.hh"
 #include "G4Gamma.hh"
 #include "G4IonConstructor.hh"
 #include "G4Proton.hh"
@@ -16,7 +20,28 @@
 // real energy loss too), which is exactly what BgoSD/DsssdSD (see
 // README's "Sensitive detectors") need for their hits' edep to read
 // anything but zero.
-PhysicsList::PhysicsList() : fEmPhysics(new G4EmStandardPhysics()) {}
+//
+// EM_PHYSICS_LIST=option4 (diagnostic-only env var, defaults to the plain
+// G4EmStandardPhysics above if unset) swaps in G4EmStandardPhysics_option4
+// instead -- Geant4's own most precise standard EM constructor (finer
+// energy-loss/fluctuation binning, more accurate low-energy ion stopping
+// and multiple-scattering models; used e.g. by hadron-therapy
+// applications where energy-loss straggling accuracy specifically
+// matters). Same G4VPhysicsConstructor interface, so nothing else about
+// PhysicsList needs to change to use it -- a way to cross-check whether
+// this pilot's default choice's straggling is already right, not a
+// permanent replacement for it.
+namespace {
+G4VPhysicsConstructor* MakeEmPhysics() {
+  const char* choice = std::getenv("EM_PHYSICS_LIST");
+  if (choice && std::strcmp(choice, "option4") == 0) {
+    return new G4EmStandardPhysics_option4();
+  }
+  return new G4EmStandardPhysics();
+}
+}  // namespace
+
+PhysicsList::PhysicsList() : fEmPhysics(MakeEmPhysics()) {}
 
 PhysicsList::~PhysicsList() { delete fEmPhysics; }
 

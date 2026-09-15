@@ -76,6 +76,12 @@ class ReactionKinematics {
   // GenerateEvent() is exactly GenerateEvent(BeamKineticEnergyMeV()).
   Event GenerateEvent(double beamKineticEnergyMeV) const;
 
+  // Recoil ground-state mass (MeV, AME mass-excess convention -- A*amu +
+  // massExcessMeV). Exposed for DetectorConstruction.cc's electrostatic
+  // (E1/E2) retune-scale calculation, which -- unlike the magnetic scale --
+  // genuinely depends on the recoil's own mass, not just its rigidity.
+  double RecoilGroundMassMeV() const { return fRecoilGroundMassMeV; }
+
  private:
   ReactionConfig fConfig;
   double fBeamMassMeV;
