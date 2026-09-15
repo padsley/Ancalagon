@@ -589,9 +589,9 @@ deflectors green, the target pale blue, BGO crystals gold, and the named
 slit/MCP/DSSSD markers yellow/cyan/magenta respectively.
 
 ```sh
-./dragon_g4_pilot --vis Chain              # interactive session, whole beamline
-./dragon_g4_pilot --vis Chain run_chain.mac  # batch: fires 5 design-orbit ions, exits
-./dragon_g4_pilot --vis Reaction           # same chain, real reaction events (see above)
+./Ancalagon --vis Chain              # interactive session, whole beamline
+./Ancalagon --vis Chain run_chain.mac  # batch: fires 5 design-orbit ions, exits
+./Ancalagon --vis Reaction           # same chain, real reaction events (see above)
 ```
 
 At an interactive prompt, `/run/beamOn 5` fires more events (each
@@ -640,9 +640,9 @@ so each was spot-checked on its own with a proton at the momentum matching
 *that* element's own condition:
 
 ```
-./dragon_g4_pilot --track-dipole 0.0 0.0 64.7 1     # D1: 49.9 deg vs 50 design
-./dragon_g4_pilot --track-e1     0.0 0.0 29.768 1   # E1: 19.99 deg vs 20 design
-./dragon_g4_pilot --track-e2     0.0 0.0 29.763 1   # E2: 35.00 deg vs 35 design
+./Ancalagon --track-dipole 0.0 0.0 64.7 1     # D1: 49.9 deg vs 50 design
+./Ancalagon --track-e1     0.0 0.0 29.768 1   # E1: 19.99 deg vs 20 design
+./Ancalagon --track-e2     0.0 0.0 29.763 1   # E2: 35.00 deg vs 35 design
 ```
 
 (D2 wasn't spot-checked standalone -- see the full-chain result below,
@@ -672,7 +672,7 @@ an explicit charge-state override, since 19Ne4+ isn't fully stripped);
 `--track-chain` uses it by default (`p = 4 x 64.68` = `258.7 MeV/c`):
 
 ```
-./dragon_g4_pilot --track-chain 0.0 0.0 258.7 1
+./Ancalagon --track-chain 0.0 0.0 258.7 1
 ```
 
 The ion enters along Q1's axis and exits Q14 with momentum
@@ -755,13 +755,13 @@ make -j$(nproc)
 
 # Field validation (each writes/reads its own CSV pair; compare_fields.py
 # takes <fortran.csv> <cpp.csv>)
-./dragon_g4_pilot --probe            # Q1  -> q1_cpp_reference.csv
-./dragon_g4_pilot --probe-q2         # Q2  -> q2_cpp_reference.csv
-./dragon_g4_pilot --probe-q3-q14     # Q3-Q14 (combined) -> q3_q14_cpp_reference.csv
-./dragon_g4_pilot --probe-dipole     # D1  -> d1_cpp_reference.csv
-./dragon_g4_pilot --probe-dipole-d2  # D2  -> d2_cpp_reference.csv
-./dragon_g4_pilot --probe-e1         # E1  -> e1_cpp_reference.csv
-./dragon_g4_pilot --probe-e2         # E2  -> e2_cpp_reference.csv
+./Ancalagon --probe            # Q1  -> q1_cpp_reference.csv
+./Ancalagon --probe-q2         # Q2  -> q2_cpp_reference.csv
+./Ancalagon --probe-q3-q14     # Q3-Q14 (combined) -> q3_q14_cpp_reference.csv
+./Ancalagon --probe-dipole     # D1  -> d1_cpp_reference.csv
+./Ancalagon --probe-dipole-d2  # D2  -> d2_cpp_reference.csv
+./Ancalagon --probe-e1         # E1  -> e1_cpp_reference.csv
+./Ancalagon --probe-e2         # E2  -> e2_cpp_reference.csv
 
 cd ../validate
 gfortran -Dgfortran -fallow-argument-mismatch -I../../G3_DRAGON/inc \
@@ -792,20 +792,20 @@ python3 compare_fields.py e2_fortran_reference.csv ../build/e2_cpp_reference.csv
 
 # Tracking demos: x0(cm) y0(cm) p(MeV/c) nEvents
 cd ../build
-./dragon_g4_pilot --track        1.0 0.0 3000 1     # Q1 (standalone)
-./dragon_g4_pilot --track-q2     1.0 0.0 3000 1     # Q2 (standalone)
-./dragon_g4_pilot --track-dipole 0.0 0.0 64.7 1     # D1 (standalone), on design orbit
-./dragon_g4_pilot --track-e1     0.0 0.0 29.768 1   # E1 (standalone), on design orbit
-./dragon_g4_pilot --track-e2     0.0 0.0 29.763 1   # E2 (standalone), on design orbit
-./dragon_g4_pilot --track-chain  0.0 0.0 258.7 1     # ALL 18 elements, 19Ne4+ on design orbit
-./dragon_g4_pilot --track-reaction 5          # ALL 18 elements, real 15O(a,g)19Ne events (nEvents only)
-./dragon_g4_pilot --reaction-stats            # sanity-check the reaction file's own cascade (no G4RunManager)
-./dragon_g4_pilot --probe-recoil-dedx         # 19Ne stopping power in the target gas, MeV/cm and MeV/(mg/cm^2)
+./Ancalagon --track        1.0 0.0 3000 1     # Q1 (standalone)
+./Ancalagon --track-q2     1.0 0.0 3000 1     # Q2 (standalone)
+./Ancalagon --track-dipole 0.0 0.0 64.7 1     # D1 (standalone), on design orbit
+./Ancalagon --track-e1     0.0 0.0 29.768 1   # E1 (standalone), on design orbit
+./Ancalagon --track-e2     0.0 0.0 29.763 1   # E2 (standalone), on design orbit
+./Ancalagon --track-chain  0.0 0.0 258.7 1     # ALL 18 elements, 19Ne4+ on design orbit
+./Ancalagon --track-reaction 5          # ALL 18 elements, real 15O(a,g)19Ne events (nEvents only)
+./Ancalagon --reaction-stats            # sanity-check the reaction file's own cascade (no G4RunManager)
+./Ancalagon --probe-recoil-dedx         # 19Ne stopping power in the target gas, MeV/cm and MeV/(mg/cm^2)
 
 # Visualization (see "Visualization" above)
-./dragon_g4_pilot --vis Chain                # interactive
-./dragon_g4_pilot --vis Chain run_chain.mac  # batch, 5 events, then exit
-./dragon_g4_pilot --vis Reaction              # interactive, real reaction events
+./Ancalagon --vis Chain                # interactive
+./Ancalagon --vis Chain run_chain.mac  # batch, 5 events, then exit
+./Ancalagon --vis Reaction              # interactive, real reaction events
 ```
 
 ## What this pilot does *not* cover (i.e. what's left for the full port)

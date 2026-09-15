@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16...3.27)
-project(dragon_g4_pilot CXX)
+project(Ancalagon CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,9 +10,9 @@ include(${Geant4_USE_FILE})
 file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cc)
 file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.hh)
 
-add_executable(dragon_g4_pilot ${sources} ${headers})
-target_include_directories(dragon_g4_pilot PRIVATE include)
-target_link_libraries(dragon_g4_pilot PRIVATE ${Geant4_LIBRARIES})
+add_executable(Ancalagon ${sources} ${headers})
+target_include_directories(Ancalagon PRIVATE include)
+target_link_libraries(Ancalagon PRIVATE ${Geant4_LIBRARIES})
 
 foreach(_script vis.mac init_vis.mac run_chain.mac)
   configure_file(${PROJECT_SOURCE_DIR}/macros/${_script} ${PROJECT_BINARY_DIR}/${_script} COPYONLY)

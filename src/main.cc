@@ -652,7 +652,7 @@ int RunBeamThroughTarget(int argc, char** argv) {
   return 0;
 }
 
-// Interactive/visual session: `dragon_g4_pilot --vis [element] [macro]`.
+// Interactive/visual session: `Ancalagon --vis [element] [macro]`.
 // Opens a viewer (see macros/init_vis.mac -- picks whatever driver is
 // available, Qt/OGL/etc.) and either runs the given macro or drops into
 // an interactive prompt (/run/beamOn, /vis/... commands by hand).
