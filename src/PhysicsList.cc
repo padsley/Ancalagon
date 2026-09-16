@@ -7,7 +7,10 @@
 #include "G4EmStandardPhysics_option4.hh"
 #include "G4Gamma.hh"
 #include "G4IonConstructor.hh"
+#include "G4ParticleTable.hh"
+#include "G4ProcessManager.hh"
 #include "G4Proton.hh"
+#include "G4StepLimiter.hh"
 
 // G4EmStandardPhysics is a G4VPhysicsConstructor -- ordinarily plugged
 // into a G4VModularPhysicsList, but perfectly fine to own and delegate to
@@ -57,4 +60,26 @@ void PhysicsList::ConstructParticle() {
 void PhysicsList::ConstructProcess() {
   AddTransportation();
   fEmPhysics->ConstructProcess();
+
+  // G4UserLimits' own MaxAllowedStep is only enforced by a G4StepLimiter
+  // process -- G4Transportation alone only limits step length by field
+  // curvature/geometry-boundary criteria, which is why a smooth-field
+  // container (E1/E2/a dipole/a quad, all one logical volume with no
+  // internal geometric boundary) can take one single, large adaptive step
+  // across its whole length even with G4UserLimits set on it. Registering
+  // this (for every charged particle this pilot ever tracks -- proton,
+  // e-/e+ from EM physics, and the generic ion species) is what actually
+  // makes DetectorConstruction's FINE_STEP_CM diagnostic knob do anything.
+  // A no-op for every particle unless FINE_STEP_CM is set (no G4UserLimits
+  // attached to any volume otherwise), so this doesn't change default
+  // behavior.
+  auto* stepLimiter = new G4StepLimiter();
+  auto* particleIterator = G4ParticleTable::GetParticleTable()->GetIterator();
+  particleIterator->reset();
+  while ((*particleIterator)()) {
+    G4ParticleDefinition* particle = particleIterator->value();
+    if (particle->GetPDGCharge() != 0.0) {
+      particle->GetProcessManager()->AddProcess(stepLimiter, -1, -1, 1);
+    }
+  }
 }

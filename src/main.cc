@@ -453,7 +453,17 @@ G4RunManager* BuildRunManager(const std::string& element, double x0Cm, double y0
     // proton can't satisfy both at once; solving m/q = p^2/(2*KE) gives
     // m/q = 4.758 u/e, i.e. (for q=4e) m = 19.03u -- a 19Ne4+ recoil,
     // consistent with this file's own comments about a 19Ne reaction.
-    runManager->SetUserAction(new PrimaryGeneratorAction(x0Cm, y0Cm, pMeV, z0Cm, 10, 19, 4));
+    //
+    // Diagnostic-only override of the fired ion's own mass number (A),
+    // element (Z) held fixed at neon (10) -- for mass-resolving-power
+    // studies: firing neighbouring Ne isotopes (18/19/20/21) at design
+    // charge state and design momentum tests how far the separator's own
+    // M-E-E-M optics actually separate different masses at fixed p/q,
+    // cross-checkable against the paper's own first-order M/dM figure.
+    // Defaults to the real 19Ne, so omitting it changes nothing.
+    const char* trackChainAEnv = std::getenv("TRACK_CHAIN_A");
+    const int trackChainA = trackChainAEnv ? std::atoi(trackChainAEnv) : 19;
+    runManager->SetUserAction(new PrimaryGeneratorAction(x0Cm, y0Cm, pMeV, z0Cm, 10, trackChainA, 4));
     // See SteppingAction's own comment: without this, G4ionIonisation's
     // effective-charge model silently drifts this ion's tracked charge
     // away from its real, fixed 4+ state, corrupting every bend downstream.

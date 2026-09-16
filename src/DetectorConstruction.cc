@@ -11,6 +11,7 @@
 #include "G4FieldManager.hh"
 #include "G4IntegrationDriver.hh"
 #include "G4LogicalVolume.hh"
+#include "G4LogicalVolumeStore.hh"
 #include "G4MagIntegratorStepper.hh"
 #include "G4Mag_UsualEqRhs.hh"
 #include "G4Material.hh"
@@ -22,6 +23,7 @@
 #include "G4SystemOfUnits.hh"
 #include "G4ThreeVector.hh"
 #include "G4Tubs.hh"
+#include "G4UserLimits.hh"
 #include "G4VisAttributes.hh"
 #include "BgoArray.hh"
 #include "DsssdSD.hh"
@@ -981,6 +983,25 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
       auto* dsssdSD = new DsssdSD("DsssdSD");
       G4SDManager::GetSDMpointer()->AddNewDetector(dsssdSD);
       dsssdLV->SetSensitiveDetector(dsssdSD);
+    }
+
+    // Diagnostic-only: without a max-step constraint, G4's own adaptive
+    // stepper takes one huge step across an entire smooth-field container
+    // (E1/E2/dipoles/quads can each be tens of cm with no intervening
+    // geometric boundary), so SteppingAction's per-step TRAJ dump only
+    // samples the trajectory at the container's entrance/exit -- nowhere
+    // near dense enough to interpolate a position mid-element (e.g. to
+    // find where a ray crosses a specific z plane inside/just past a
+    // bending element). FINE_STEP_CM caps every logical volume's own
+    // max step size, for exactly that kind of position-probing study;
+    // unset by default, so omitting it changes nothing.
+    const char* fineStepEnv = std::getenv("FINE_STEP_CM");
+    if (fineStepEnv) {
+      const double fineStepCm = std::atof(fineStepEnv);
+      auto* limits = new G4UserLimits(fineStepCm * cm);
+      for (auto* lv : *G4LogicalVolumeStore::GetInstance()) {
+        lv->SetUserLimits(limits);
+      }
     }
 
     return worldPV;
