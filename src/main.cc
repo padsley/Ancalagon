@@ -29,6 +29,7 @@
 #include "MitrayQuadrupoleField.hh"
 #include "PhysicsList.hh"
 #include "PrimaryGeneratorAction.hh"
+#include "Randomize.hh"
 #include "ReactionConfig.hh"
 #include "ReactionKinematics.hh"
 #include "SteppingAction.hh"
@@ -711,6 +712,15 @@ int RunVis(int argc, char** argv) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  // Diagnostic-only: this pilot otherwise always uses Geant4's own fixed
+  // default RNG seed (confirmed: two identical runs give bit-identical
+  // TRAJ output) -- for a multi-seed re-validation study (independent
+  // realizations of the same statistics, to separate a real coarse-vs-
+  // fine-step bias from ordinary run-to-run stochastic scatter). Unset by
+  // default, so omitting it changes nothing.
+  if (const char* seedEnv = std::getenv("RANDOM_SEED")) {
+    CLHEP::HepRandom::setTheSeed(std::atol(seedEnv));
+  }
   if (argc > 1 && std::strcmp(argv[1], "--vis") == 0) {
     return RunVis(argc, argv);
   }
