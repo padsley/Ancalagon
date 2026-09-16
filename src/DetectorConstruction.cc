@@ -761,20 +761,23 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
         reactionInputEnv ? std::string(reactionInputEnv) : std::string("o15ag_19ne.reaction");
     const ReactionConfig reactionConfig = ReactionConfig::Load(reactionPath);
 
-    // Diagnostic-only override of the mass slit's (MSLT) own dispersive
-    // (X) half-aperture -- real card value 0.75cm (see the "MSLT" call
-    // site below) -- for studying how much of the mass-slit's own
-    // transmission loss is the aperture itself vs. everything upstream of
-    // it. Not a real hardware parameter this pilot would otherwise expose;
-    // defaults to the real value, so omitting it changes nothing.
+    // Overridable mass slit (MSLT) dispersive (X) half-aperture. The real
+    // 2014-tune hardware card value is 0.75cm (see dat/dragon_2014_DSSSD.dat's
+    // own 'RCOL' 'MSLT' card) -- MSLT is a physically adjustable slit on the
+    // real hardware, not a fixed design constant, and this pilot's own
+    // default is deliberately set wide open (2.5cm, the real dat/dragon_2001.dat
+    // tune) at padsley's own request (2026-09-16), since MSLT-limited
+    // transmission was masking other, more interesting effects (e.g. the
+    // gamma-cascade recoil-angle cutoff). Change back to 0.75 (or override
+    // via MSLT_HALFGAP_X_CM) to study the real 2014 tune specifically.
     const char* msltHalfGapEnv = std::getenv("MSLT_HALFGAP_X_CM");
-    const double msltHalfGapXCm = msltHalfGapEnv ? std::atof(msltHalfGapEnv) : 0.75;
+    const double msltHalfGapXCm = msltHalfGapEnv ? std::atof(msltHalfGapEnv) : 2.5;
 
-    // Same override again, for MSLT's non-dispersive (Y) half-aperture --
-    // real card value 1.25cm (same call site). Defaults to the real value,
-    // so omitting it changes nothing.
+    // Same, for MSLT's non-dispersive (Y) half-aperture -- real 2014-tune
+    // value 1.25cm, defaulted here to the same wide-open 2.5cm for the same
+    // reason (see above); override via MSLT_HALFGAP_Y_CM.
     const char* msltHalfGapYEnv = std::getenv("MSLT_HALFGAP_Y_CM");
-    const double msltHalfGapYCm = msltHalfGapYEnv ? std::atof(msltHalfGapYEnv) : 1.25;
+    const double msltHalfGapYCm = msltHalfGapYEnv ? std::atof(msltHalfGapYEnv) : 2.5;
 
     // Same diagnostic override, for the charge slit's (QSLT) own dispersive
     // (X) half-aperture -- real card value 1.25cm (see the "QSLT" call site
@@ -890,7 +893,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 47.625);                                      // DF27, line 232
     ChainCollimator(s, worldLV, copper, "RC27", true, 0, 0, 4.92, 6.96, 47.625);  // line 233
     Drift(s, 47.625);                                      // DF28 (1st), line 236
-    ChainCollimator(s, worldLV, copper, "MSLT", false, 0, 0, msltHalfGapXCm, msltHalfGapYCm, 0.025, 10.0);  // line 237 (mass slit; MSLT_HALFGAP_X_CM/MSLT_HALFGAP_Y_CM override the real 0.75/1.25cm values -- see above)
+    ChainCollimator(s, worldLV, copper, "MSLT", false, 0, 0, msltHalfGapXCm, msltHalfGapYCm, 0.025, 10.0);  // line 237 (mass slit; defaults wide open at 2.5x2.5cm -- see msltHalfGapXCm/msltHalfGapYCm above -- override via MSLT_HALFGAP_X_CM/MSLT_HALFGAP_Y_CM)
     Drift(s, 3.6);                                         // DF28 (2nd), line 243
     Drift(s, 22.9);                                        // DFBB, line 245
     ChainCollimator(s, worldLV, copper, "RC28", true, 0, 0, 4.92, 5.08, 26.8);  // line 246
