@@ -679,6 +679,30 @@ void ChainCollimator(const ChainState& s, G4LogicalVolume* worldLV, G4Material* 
 
 }  // namespace
 
+namespace {
+// Diagnostic-only: without a max-step constraint, G4's own adaptive
+// stepper can take one huge step across an entire smooth-field container
+// (a quad/dipole/edipole's own bounding volume can be tens of cm with no
+// intervening geometric boundary) -- see the finding at this call's own
+// use sites: for at least Q1/Q2/D1 in "Chain" mode, that single big step
+// was not just under-sampled but produced a genuinely different final
+// position/momentum than the same trajectory computed with small steps,
+// well beyond anything explained by the 1e-3mm chord-accuracy target
+// already configured on every field's own G4ChordFinder. FINE_STEP_CM
+// caps every logical volume's own max step size (via G4UserLimits, which
+// needs PhysicsList.cc's own G4StepLimiter process registration to do
+// anything at all); unset by default, so omitting it changes nothing.
+void ApplyFineStepIfRequested() {
+  const char* fineStepEnv = std::getenv("FINE_STEP_CM");
+  if (!fineStepEnv) return;
+  const double fineStepCm = std::atof(fineStepEnv);
+  auto* limits = new G4UserLimits(fineStepCm * cm);
+  for (auto* lv : *G4LogicalVolumeStore::GetInstance()) {
+    lv->SetUserLimits(limits);
+  }
+}
+}  // namespace
+
 G4VPhysicalVolume* DetectorConstruction::Construct() {
   G4NistManager* nist = G4NistManager::Instance();
   G4Material* vacuum = nist->FindOrBuildMaterial("G4_Galactic");
@@ -697,21 +721,25 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
 
   if (fElement == "D1") {
     BuildD1(worldLV, vacuum, 0.0, kD1CenterZCm);
+    ApplyFineStepIfRequested();
     return worldPV;
   }
 
   if (fElement == "Q2") {
     BuildQuad(worldLV, vacuum, "Q2", MitrayPoleData::Q2(), 0.0, kQ1CenterZCm);
+    ApplyFineStepIfRequested();
     return worldPV;
   }
 
   if (fElement == "E1") {
     BuildEdipole(worldLV, vacuum, "E1", MitrayEdipoleData::E1(), 0.0, kE1CenterZCm);
+    ApplyFineStepIfRequested();
     return worldPV;
   }
 
   if (fElement == "E2") {
     BuildEdipole(worldLV, vacuum, "E2", MitrayEdipoleData::E2(), 0.0, kE2CenterZCm);
+    ApplyFineStepIfRequested();
     return worldPV;
   }
 
@@ -985,29 +1013,12 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
       dsssdLV->SetSensitiveDetector(dsssdSD);
     }
 
-    // Diagnostic-only: without a max-step constraint, G4's own adaptive
-    // stepper takes one huge step across an entire smooth-field container
-    // (E1/E2/dipoles/quads can each be tens of cm with no intervening
-    // geometric boundary), so SteppingAction's per-step TRAJ dump only
-    // samples the trajectory at the container's entrance/exit -- nowhere
-    // near dense enough to interpolate a position mid-element (e.g. to
-    // find where a ray crosses a specific z plane inside/just past a
-    // bending element). FINE_STEP_CM caps every logical volume's own
-    // max step size, for exactly that kind of position-probing study;
-    // unset by default, so omitting it changes nothing.
-    const char* fineStepEnv = std::getenv("FINE_STEP_CM");
-    if (fineStepEnv) {
-      const double fineStepCm = std::atof(fineStepEnv);
-      auto* limits = new G4UserLimits(fineStepCm * cm);
-      for (auto* lv : *G4LogicalVolumeStore::GetInstance()) {
-        lv->SetUserLimits(limits);
-      }
-    }
-
+    ApplyFineStepIfRequested();
     return worldPV;
   }
 
   // Standalone Q1 (default).
   BuildQuad(worldLV, vacuum, "Q1", MitrayPoleData::Q1(), 0.0, kQ1CenterZCm);
+  ApplyFineStepIfRequested();
   return worldPV;
 }
