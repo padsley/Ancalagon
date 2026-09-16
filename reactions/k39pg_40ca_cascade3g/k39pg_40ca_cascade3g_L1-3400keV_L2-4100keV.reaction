@@ -1,0 +1,42 @@
+COMM 39K(p,gamma)40Ca three-step gamma cascade scan -- 2D grid of two
+COMM fictional intermediate levels, terminating at the TRUE GROUND
+COMM STATE. Same beam/target/recoil/resonance physics as
+COMM reactions/k39pg_40ca.reaction (see that file for the full
+COMM mass/kinematics derivation) and the same single-level scan
+COMM convention as reactions/k39pg_40ca_cascade_*.reaction (see any of
+COMM those for that series' own derivation) -- this series just adds a
+COMM second intermediate level above the first. Cascade: resonance ->
+COMM Level2 -> Level1 -> ground, three gammas per event (100% branching
+COMM at each step, no other decay path). Resonance excitation above
+COMM ground: Ex = Q + Er = 8.32777 + 0.606 = 8.93377 MeV. Level1 ranges
+COMM 0.1 MeV up to (Level2's own cap minus 0.1 MeV); Level2 ranges from
+COMM (Level1 + 0.1 MeV) up to 8.8 MeV (Ex - 0.1 MeV, rounded down to the
+COMM 0.1 MeV grid) -- the same cap the single-level series itself used.
+COMM
+COMM THIS FILE: Level1 = 3.4000 MeV, Level2 = 4.1000 MeV (both
+COMM absolute excitation above ground). Gamma energies (before
+COMM recoil-kinematics corrections, which this pilot's
+COMM ReactionKinematics does apply): gamma1 = Ex - Level2 = 4.8338 MeV
+COMM (resonance -> Level2), gamma2 = Level2 - Level1 = 0.7000 MeV
+COMM (Level2 -> Level1), gamma3 = Level1 = 3.4000 MeV (Level1 ->
+COMM ground). Every event emits exactly three gammas -- verify with
+COMM `--reaction-stats <this file>`.
+COMM
+COMM Both intermediate levels' lifetimes below are placeholders
+COMM (1e-12 s), fictional like the levels themselves and unused by the
+COMM kinematics (see ReactionConfig.hh's own LEVL card comment: this
+COMM pilot's cascade is instantaneous-at-vertex, not a real modeled
+COMM flight time).
+
+BEAM 19  39   -33.8072      # Z A massExcessMeV -- 39K
+TARG 1   1    7.28897       # 1H (target, at rest)
+RECL 20  40   -34.8460   8  # 40Ca, placeholder charge state (see k39pg_40ca.reaction)
+ERES 0.606                  # CM resonance energy above threshold, MeV
+
+LEVL   1   3.4000   1.0E-12   # fictional lower intermediate level
+LEVL   2   4.1000   1.0E-12   # fictional upper intermediate level
+
+BRAT   -1  100.0   2        # resonance -> upper intermediate, 100%
+BRAT    2  100.0   1        # upper intermediate -> lower intermediate, 100%
+BRAT    1  100.0   0        # lower intermediate -> ground, 100%
+SENT
