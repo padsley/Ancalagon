@@ -151,7 +151,15 @@ double QuadTrimScale(int n) {
   char name[32];
   std::snprintf(name, sizeof(name), "Q%d_TRIM_SCALE", n);
   const char* env = std::getenv(name);
-  return env ? std::atof(env) : 1.0;
+  const double perQuad = env ? std::atof(env) : 1.0;
+  // ALL_QUAD_TRIM_SCALE=<scale> -- applies to every quad uniformly, on top
+  // of each quad's own QN_TRIM_SCALE -- for testing "scale the whole lens
+  // system by one common factor, leave the bending magnets alone" (as
+  // opposed to GLOBAL_FIELD_TRIM_SCALE below, which scales everything
+  // including D1/D2). Default 1.0 (no change).
+  const char* allEnv = std::getenv("ALL_QUAD_TRIM_SCALE");
+  const double allQuads = allEnv ? std::atof(allEnv) : 1.0;
+  return perQuad * allQuads;
 }
 
 MitrayPoleData RetunedQuad(MitrayPoleData d, double magneticScale) {
@@ -848,9 +856,23 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     // reachable if some other call site doesn't resolve one) falls back to
     // that same old behavior. electricScale is NOT simply this squared in
     // general -- see ComputeElectricRetuneScale's own comment.
-    const double magneticScale = (fMagneticRetuneScaleOverride > 0.0)
+    const double magneticScaleBase = (fMagneticRetuneScaleOverride > 0.0)
                                       ? fMagneticRetuneScaleOverride
                                       : ComputeMagneticRetuneScale(reactionConfig);
+    // GLOBAL_FIELD_TRIM_SCALE=<scale> -- multiplies the WHOLE separator's
+    // own retune scale (quads, D1/D2, and (self-consistently, since it's
+    // applied before ComputeElectricRetuneScale) E1/E2 too), on top of
+    // whatever magneticScaleBase already is. Equivalent to testing a
+    // slightly different real recoil rigidity than the RTUN-card/
+    // auto-measured one -- a classic spectrometer trick (a small global
+    // field/energy mismatch produces a coherent aberration pattern across
+    // the whole beamline, fixable by one global scale rather than each
+    // element separately) distinct from ALL_QUAD_TRIM_SCALE above (which
+    // only touches the quads, leaving the bends alone). Default 1.0 (no
+    // change).
+    const char* globalFieldEnv = std::getenv("GLOBAL_FIELD_TRIM_SCALE");
+    const double globalFieldTrim = globalFieldEnv ? std::atof(globalFieldEnv) : 1.0;
+    const double magneticScale = magneticScaleBase * globalFieldTrim;
     const double electricScale = ComputeElectricRetuneScale(reactionConfig, magneticScale);
 
     ChainState s;
