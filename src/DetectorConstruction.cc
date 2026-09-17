@@ -843,7 +843,30 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     G4VisAttributes tstVis(G4Colour(0.0, 1.0, 1.0));  // cyan: MCP0/MCP1 markers
     tstVis.SetForceWireframe(true);
 
-    const MitrayPoleData q1data = RetunedQuad(MitrayPoleData::Q1(), magneticScale);
+    // Diagnostic-only Q1/Q2 field-strength trims, on top of magneticScale --
+    // for probing whether QSLT's own (x|a) achromatic-focus residual (see
+    // the session that added this: padsley noticed QSLT isn't a clean
+    // focus per Hutcheon Fig. 1/Table 2) can be zeroed the same way
+    // kD2ResidualTrim above fixes D2's own bend-angle undershoot. Both
+    // default to 1.0 (no change from magneticScale alone).
+    //
+    // Findings from that session, NOT baked in as a new default (padsley's
+    // own call -- this is a much bigger correction than kD2ResidualTrim's
+    // 2.6%, so it stays opt-in pending more confidence): Q1_TRIM_SCALE has
+    // little effect on QSLT's slope (0.73-0.86 mm/mrad over a 0.90-1.10
+    // scan); Q2_TRIM_SCALE=1.35 alone (Q1 untouched) drives the slope from
+    // 0.79 mm/mrad to -0.0005 mm/mrad (confirmed unchanged at 4x finer
+    // FINE_STEP_CM, so a real field effect, not integration noise), leaves
+    // MSLT's own separate residual essentially unchanged (-2.27 to
+    // -2.25 mm/mrad -- this fix is properly localized to the Charge
+    // focus), and independently improves real DSSSD transmission
+    // (500-event o15ag_19ne: 18->108 hits; 1000-event k39pg_40ca: 553->612).
+    const char* q1TrimEnv = std::getenv("Q1_TRIM_SCALE");
+    const double q1TrimScale = q1TrimEnv ? std::atof(q1TrimEnv) : 1.0;
+    const char* q2TrimEnv = std::getenv("Q2_TRIM_SCALE");
+    const double q2TrimScale = q2TrimEnv ? std::atof(q2TrimEnv) : 1.0;
+
+    const MitrayPoleData q1data = RetunedQuad(MitrayPoleData::Q1(), magneticScale * q1TrimScale);
     const double q1EntryToCentreCm = q1data.A + (q1data.Z22 + q1data.L - q1data.Z11) / 2.0;
     s.xCm = 0.0;
     s.zCm = kQ1CenterZCm - q1EntryToCentreCm;  // Q1's own entry point
@@ -861,7 +884,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     // matters (a silent, chain-wide field-masking bug otherwise).
     ChainQuad(s, worldLV, vacuum, "Q1", q1data, 27.5000);         // line 19
     Drift(s, 25.6925);                                   // DF7,  line 32
-    ChainQuad(s, worldLV, vacuum, "Q2", RetunedQuad(MitrayPoleData::Q2(), magneticScale), 27.5000);  // line 35
+    ChainQuad(s, worldLV, vacuum, "Q2", RetunedQuad(MitrayPoleData::Q2(), magneticScale * q2TrimScale), 27.5000);  // line 35
     Drift(s, 26.4);                                       // DF9,  line 46
     ChainCollimator(s, worldLV, copper, "RC9", true, 0, 0, 7.46, 7.62, 26.4);  // line 47
     Drift(s, 26.4);                                       // DF10, line 50
