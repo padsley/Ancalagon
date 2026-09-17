@@ -1,6 +1,7 @@
 #include "DetectorConstruction.hh"
 
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 
 #include "G4Box.hh"
@@ -366,6 +367,17 @@ void Shift(ChainState& s, double dxCm) {
   s.zCm -= dxCm * std::sin(th);
 }
 
+// Diagnostic-only: DUMP_CHAIN_GEOMETRY=1 prints every named element's own
+// reference-axis state (world x/z, local theta) as it's placed -- for
+// reconstructing the design axis as an analytic line/arc polyline (for a
+// beam-envelope plot, e.g.), without hand-transcribing Drift/Shift lengths
+// from source. Unset by default, so omitting it changes nothing.
+void DumpChainState(const char* tag, const ChainState& s) {
+  if (!std::getenv("DUMP_CHAIN_GEOMETRY")) return;
+  std::fprintf(stderr, "DUMP_CHAIN %-8s xCm=%.6f zCm=%.6f thetaDeg=%.6f\n", tag, s.xCm, s.zCm,
+               s.thetaDeg);
+}
+
 // Placement rotation shared by every rotated volume past a bend -- real
 // absorbing geometry (collimators) and the quad/dipole/edipole field
 // containers alike, now that none of them fall back to an orientation-
@@ -441,6 +453,7 @@ void AttachElectric(G4LogicalVolume* lv, G4ElectricField* field) {
 // own physical core half-length (data.L/2) with room to spare.
 void ChainQuad(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, const char* name,
                const MitrayPoleData& data, double maxExtentCm) {
+  DumpChainState(name, s);
   const double th = s.thetaDeg * CLHEP::pi / 180.0;
   const double entryToCentreCm = data.A + (data.Z22 + data.L - data.Z11) / 2.0;
   const double centerXCm = s.xCm + entryToCentreCm * std::sin(th);
@@ -487,6 +500,7 @@ void ChainQuad(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, cons
 // whichever neighbour is closest to the midpoint) -- see the call sites.
 void ChainDipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, const char* name,
                  const MitrayDipoleData& data, double containerRadiusCm) {
+  DumpChainState(name, s);
   const double th = s.thetaDeg * CLHEP::pi / 180.0;
   const double originXCm = s.xCm, originZCm = s.zCm;
 
@@ -531,6 +545,9 @@ void ChainDipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, co
   s.xCm = originXCm + std::cos(th) * exitXLocalCm + std::sin(th) * exitZLocalCm;
   s.zCm = originZCm - std::sin(th) * exitXLocalCm + std::cos(th) * exitZLocalCm;
   s.thetaDeg -= data.PHI;
+  char exitTag[32];
+  std::snprintf(exitTag, sizeof(exitTag), "%s_exit", name);
+  DumpChainState(exitTag, s);
 }
 
 // Same pattern as ChainDipole(), for an electrostatic deflector (also
@@ -543,6 +560,7 @@ void ChainDipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, co
 // both the transverse and vertical half-extent here.
 void ChainEdipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, const char* name,
                   const MitrayEdipoleData& data, double containerRadiusCm) {
+  DumpChainState(name, s);
   const double th = s.thetaDeg * CLHEP::pi / 180.0;
   const double originXCm = s.xCm, originZCm = s.zCm;
 
@@ -572,6 +590,9 @@ void ChainEdipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, c
   s.xCm = originXCm + std::cos(th) * exitXLocalCm + std::sin(th) * exitZLocalCm;
   s.zCm = originZCm - std::sin(th) * exitXLocalCm + std::cos(th) * exitZLocalCm;
   s.thetaDeg -= data.PHI;
+  char exitTag[32];
+  std::snprintf(exitTag, sizeof(exitTag), "%s_exit", name);
+  DumpChainState(exitTag, s);
 }
 
 // Places a thin, labeled, purely-decorative wireframe marker box at the
@@ -644,6 +665,7 @@ void ChainMarker(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, co
 void ChainCollimator(const ChainState& s, G4LogicalVolume* worldLV, G4Material* copper,
                       const char* name, bool isCircular, double offsetXCm, double offsetYCm,
                       double dataXCm, double dataYCm, double halfZCm, double magnification = 1.0) {
+  DumpChainState(name, s);
   const double thetaRad = s.thetaDeg * CLHEP::pi / 180.0;
   G4RotationMatrix* rot = BeamAxisRotation(s.thetaDeg);
 
