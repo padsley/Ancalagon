@@ -140,6 +140,20 @@ double ComputeMagneticRetuneScale(const ReactionConfig& cfg) {
 
 namespace {
 
+// Diagnostic-only per-quad field-strength trim, on top of magneticScale --
+// QN_TRIM_SCALE=<scale> for quad N (1-14), default 1.0 (no change). Added
+// to generalize the QSLT-focus retrim investigation (Q2_TRIM_SCALE=1.35 --
+// see DetectorConstruction's own "Chain" build site comment) to every
+// quad, for checking whether the same kind of achromatic-focus residual
+// shows up -- and is similarly fixable -- at the other named foci
+// (MSLT/FSLT), not just QSLT.
+double QuadTrimScale(int n) {
+  char name[32];
+  std::snprintf(name, sizeof(name), "Q%d_TRIM_SCALE", n);
+  const char* env = std::getenv(name);
+  return env ? std::atof(env) : 1.0;
+}
+
 MitrayPoleData RetunedQuad(MitrayPoleData d, double magneticScale) {
   d.BQD *= magneticScale;
   d.BHX *= magneticScale;
@@ -843,30 +857,29 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     G4VisAttributes tstVis(G4Colour(0.0, 1.0, 1.0));  // cyan: MCP0/MCP1 markers
     tstVis.SetForceWireframe(true);
 
-    // Diagnostic-only Q1/Q2 field-strength trims, on top of magneticScale --
-    // for probing whether QSLT's own (x|a) achromatic-focus residual (see
-    // the session that added this: padsley noticed QSLT isn't a clean
-    // focus per Hutcheon Fig. 1/Table 2) can be zeroed the same way
-    // kD2ResidualTrim above fixes D2's own bend-angle undershoot. Both
+    // Diagnostic-only per-quad field-strength trims, on top of
+    // magneticScale -- QuadTrimScale(n)/QN_TRIM_SCALE, see that function's
+    // own comment. Added for probing whether QSLT's own (x|a)
+    // achromatic-focus residual (padsley noticed QSLT isn't a clean focus
+    // per Hutcheon Fig. 1/Table 2) can be zeroed the same way
+    // kD2ResidualTrim above fixes D2's own bend-angle undershoot; then
+    // generalized to every quad to check whether the same kind of residual
+    // -- and the same kind of fix -- shows up at MSLT/FSLT too. All
     // default to 1.0 (no change from magneticScale alone).
     //
-    // Findings from that session, NOT baked in as a new default (padsley's
-    // own call -- this is a much bigger correction than kD2ResidualTrim's
-    // 2.6%, so it stays opt-in pending more confidence): Q1_TRIM_SCALE has
-    // little effect on QSLT's slope (0.73-0.86 mm/mrad over a 0.90-1.10
-    // scan); Q2_TRIM_SCALE=1.35 alone (Q1 untouched) drives the slope from
-    // 0.79 mm/mrad to -0.0005 mm/mrad (confirmed unchanged at 4x finer
-    // FINE_STEP_CM, so a real field effect, not integration noise), leaves
-    // MSLT's own separate residual essentially unchanged (-2.27 to
-    // -2.25 mm/mrad -- this fix is properly localized to the Charge
-    // focus), and independently improves real DSSSD transmission
-    // (500-event o15ag_19ne: 18->108 hits; 1000-event k39pg_40ca: 553->612).
-    const char* q1TrimEnv = std::getenv("Q1_TRIM_SCALE");
-    const double q1TrimScale = q1TrimEnv ? std::atof(q1TrimEnv) : 1.0;
-    const char* q2TrimEnv = std::getenv("Q2_TRIM_SCALE");
-    const double q2TrimScale = q2TrimEnv ? std::atof(q2TrimEnv) : 1.0;
+    // Findings, NOT baked in as new defaults (padsley's own call -- these
+    // are much bigger corrections than kD2ResidualTrim's 2.6%, so they stay
+    // opt-in pending more confidence): Q1_TRIM_SCALE has little effect on
+    // QSLT's slope (0.73-0.86 mm/mrad over a 0.90-1.10 scan); Q2_TRIM_SCALE
+    // =1.35 alone (Q1 untouched) drives the slope from 0.79 mm/mrad to
+    // -0.0005 mm/mrad (confirmed unchanged at 4x finer FINE_STEP_CM, so a
+    // real field effect, not integration noise), leaves MSLT's own
+    // separate residual essentially unchanged (-2.27 to -2.25 mm/mrad --
+    // this fix is properly localized to the Charge focus), and
+    // independently improves real DSSSD transmission (500-event
+    // o15ag_19ne: 18->108 hits; 1000-event k39pg_40ca: 553->612).
 
-    const MitrayPoleData q1data = RetunedQuad(MitrayPoleData::Q1(), magneticScale * q1TrimScale);
+    const MitrayPoleData q1data = RetunedQuad(MitrayPoleData::Q1(), magneticScale * QuadTrimScale(1));
     const double q1EntryToCentreCm = q1data.A + (q1data.Z22 + q1data.L - q1data.Z11) / 2.0;
     s.xCm = 0.0;
     s.zCm = kQ1CenterZCm - q1EntryToCentreCm;  // Q1's own entry point
@@ -884,7 +897,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     // matters (a silent, chain-wide field-masking bug otherwise).
     ChainQuad(s, worldLV, vacuum, "Q1", q1data, 27.5000);         // line 19
     Drift(s, 25.6925);                                   // DF7,  line 32
-    ChainQuad(s, worldLV, vacuum, "Q2", RetunedQuad(MitrayPoleData::Q2(), magneticScale * q2TrimScale), 27.5000);  // line 35
+    ChainQuad(s, worldLV, vacuum, "Q2", RetunedQuad(MitrayPoleData::Q2(), magneticScale * QuadTrimScale(2)), 27.5000);  // line 35
     Drift(s, 26.4);                                       // DF9,  line 46
     ChainCollimator(s, worldLV, copper, "RC9", true, 0, 0, 7.46, 7.62, 26.4);  // line 47
     Drift(s, 26.4);                                       // DF10, line 50
@@ -901,22 +914,22 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     ChainCollimator(s, worldLV, copper, "RC12", true, 0, 0, 4.92, 5.08, 26.55);  // line 84
     Drift(s, 26.55);                                       // DF13, line 87
     Drift(s, 18.32);                                       // DF14, line 90
-    ChainQuad(s, worldLV, vacuum, "Q3", RetunedQuad(MitrayPoleData::Q3(), magneticScale), 21.1025);  // line 95
+    ChainQuad(s, worldLV, vacuum, "Q3", RetunedQuad(MitrayPoleData::Q3(), magneticScale * QuadTrimScale(3)), 21.1025);  // line 95
 
     Drift(s, 0.0);                                         // DF15, line 108
     Drift(s, 16.14);                                       // DF16, line 112
-    ChainQuad(s, worldLV, vacuum, "Q4", RetunedQuad(MitrayPoleData::Q4(), magneticScale), 21.1025);  // line 115
+    ChainQuad(s, worldLV, vacuum, "Q4", RetunedQuad(MitrayPoleData::Q4(), magneticScale * QuadTrimScale(4)), 21.1025);  // line 115
 
     Drift(s, 0.0);                                         // DF17, line 128
     Drift(s, 21.62);                                       // DF18, line 130
-    ChainQuad(s, worldLV, vacuum, "Q5", RetunedQuad(MitrayPoleData::Q5(), magneticScale), 27.5000);  // line 135
+    ChainQuad(s, worldLV, vacuum, "Q5", RetunedQuad(MitrayPoleData::Q5(), magneticScale * QuadTrimScale(5)), 27.5000);  // line 135
 
     Drift(s, 21.62);                                       // DF19, line 148
-    ChainQuad(s, worldLV, vacuum, "Q6", RetunedQuad(MitrayPoleData::Q6(), magneticScale), 21.1025);  // line 153
+    ChainQuad(s, worldLV, vacuum, "Q6", RetunedQuad(MitrayPoleData::Q6(), magneticScale * QuadTrimScale(6)), 21.1025);  // line 153
 
     Drift(s, 0.0);                                         // DF20, line 166
     Drift(s, 16.14);                                       // DF21, line 168
-    ChainQuad(s, worldLV, vacuum, "Q7", RetunedQuad(MitrayPoleData::Q7(), magneticScale), 21.1025);  // line 173
+    ChainQuad(s, worldLV, vacuum, "Q7", RetunedQuad(MitrayPoleData::Q7(), magneticScale * QuadTrimScale(7)), 21.1025);  // line 173
 
     Drift(s, 15.23);                                       // DF22, line 186
     Drift(s, 13.0);                                        // DF23, line 190
@@ -946,14 +959,14 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 13.5425);                                     // DF30, line 251
     ChainCollimator(s, worldLV, copper, "RC30", true, 0, 0, 4.92, 5.08, 13.5425);  // line 252
     Drift(s, 13.5425);                                     // DF31, line 255
-    ChainQuad(s, worldLV, vacuum, "Q8", RetunedQuad(MitrayPoleData::Q8(), magneticScale), 27.5000);  // line 260
+    ChainQuad(s, worldLV, vacuum, "Q8", RetunedQuad(MitrayPoleData::Q8(), magneticScale * QuadTrimScale(8)), 27.5000);  // line 260
 
     Drift(s, 0.0);                                         // DF33, line 273
     Drift(s, 25.695);                                      // DF34, line 275
-    ChainQuad(s, worldLV, vacuum, "Q9", RetunedQuad(MitrayPoleData::Q9(), magneticScale), 21.2250);  // line 280
+    ChainQuad(s, worldLV, vacuum, "Q9", RetunedQuad(MitrayPoleData::Q9(), magneticScale * QuadTrimScale(9)), 21.2250);  // line 280
 
     Drift(s, 15.81);                                       // DF35, line 293
-    ChainQuad(s, worldLV, vacuum, "Q10", RetunedQuad(MitrayPoleData::Q10(), magneticScale), 21.2250);  // line 298
+    ChainQuad(s, worldLV, vacuum, "Q10", RetunedQuad(MitrayPoleData::Q10(), magneticScale * QuadTrimScale(10)), 21.2250);  // line 298
 
     Drift(s, 9.8);                                         // DF37, line 311
     Drift(s, 26.0);                                        // DF38, line 315
@@ -967,11 +980,11 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 24.992);                                      // DF42, line 354
     ChainCollimator(s, worldLV, copper, "RC42", true, 0, 0, 7.46, 7.62, 24.992);  // line 355
     Drift(s, 24.992);                                      // DF43, line 358
-    ChainQuad(s, worldLV, vacuum, "Q11", RetunedQuad(MitrayPoleData::Q11(), magneticScale), 21.2250);  // line 363
+    ChainQuad(s, worldLV, vacuum, "Q11", RetunedQuad(MitrayPoleData::Q11(), magneticScale * QuadTrimScale(11)), 21.2250);  // line 363
 
     Drift(s, 0.0);                                         // DF43 (2nd), line 376
     Drift(s, 15.81);                                       // DF44, line 378
-    ChainQuad(s, worldLV, vacuum, "Q12", RetunedQuad(MitrayPoleData::Q12(), magneticScale), 21.2250);  // line 383
+    ChainQuad(s, worldLV, vacuum, "Q12", RetunedQuad(MitrayPoleData::Q12(), magneticScale * QuadTrimScale(12)), 21.2250);  // line 383
 
     Drift(s, 15.0);                                        // DF46, line 396
     Drift(s, 13.0);                                        // DF47, line 400
@@ -1000,10 +1013,10 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     ChainCollimator(s, worldLV, copper, "RC55", true, 0, 0, 7.46, 7.62, 12.95);  // line 459
     Drift(s, 12.95);                                       // DF56, line 462
     Drift(s, 12.0);                                        // DF51 (2nd), line 464
-    ChainQuad(s, worldLV, vacuum, "Q13", RetunedQuad(MitrayPoleData::Q13(), magneticScale), 33.3000);  // line 469
+    ChainQuad(s, worldLV, vacuum, "Q13", RetunedQuad(MitrayPoleData::Q13(), magneticScale * QuadTrimScale(13)), 33.3000);  // line 469
 
     Drift(s, 19.9);                                        // DF57, line 482
-    ChainQuad(s, worldLV, vacuum, "Q14", RetunedQuad(MitrayPoleData::Q14(), magneticScale), 33.3000);  // line 487
+    ChainQuad(s, worldLV, vacuum, "Q14", RetunedQuad(MitrayPoleData::Q14(), magneticScale * QuadTrimScale(14)), 33.3000);  // line 487
 
     // Past Q14: the beamline's final stretch to the focal-plane detector.
     // No more bending elements ('DIPO'/'EDIP' cards) appear, so theta is
