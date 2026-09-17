@@ -22,8 +22,14 @@ class PrimaryGeneratorAction : public G4VUserPrimaryGeneratorAction {
   // the same design rigidity/kinetic-energy-per-charge, which only a
   // matching ion mass -- not a proton -- can satisfy simultaneously (see
   // README).
+  // angleXDeg tilts the initial momentum direction in the horizontal
+  // (dispersive) plane away from the local z-axis -- 0 (the default)
+  // reproduces the original straight-ahead behavior exactly. For probing
+  // whether a given point along the chain is a real angle-independent
+  // focus (Table 2's own (x|a)=0 condition), by firing several angles from
+  // the same x0/z0 and checking whether they reconverge downstream.
   PrimaryGeneratorAction(double x0Cm, double y0Cm, double momentumMeV, double z0Cm, int ionZ,
-                         int ionA, int ionChargeState);
+                         int ionA, int ionChargeState, double angleXDeg = 0.0);
 
   // Fires one real reaction event per call, sampled from `reactionFilePath`
   // (see ReactionConfig.hh for the file format; reactions/o15ag_19ne.reaction

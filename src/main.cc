@@ -464,7 +464,15 @@ G4RunManager* BuildRunManager(const std::string& element, double x0Cm, double y0
     // Defaults to the real 19Ne, so omitting it changes nothing.
     const char* trackChainAEnv = std::getenv("TRACK_CHAIN_A");
     const int trackChainA = trackChainAEnv ? std::atoi(trackChainAEnv) : 19;
-    runManager->SetUserAction(new PrimaryGeneratorAction(x0Cm, y0Cm, pMeV, z0Cm, 10, trackChainA, 4));
+    // Diagnostic-only initial horizontal angle (degrees, dispersive plane)
+    // -- for testing whether a given point along the chain is a genuine
+    // angle-independent focus: fire the same x0/z0 at several angles and
+    // see whether they reconverge downstream. Defaults to 0 (straight
+    // ahead), so omitting it changes nothing.
+    const char* trackChainAngleEnv = std::getenv("TRACK_CHAIN_ANGLE_DEG");
+    const double trackChainAngleDeg = trackChainAngleEnv ? std::atof(trackChainAngleEnv) : 0.0;
+    runManager->SetUserAction(
+        new PrimaryGeneratorAction(x0Cm, y0Cm, pMeV, z0Cm, 10, trackChainA, 4, trackChainAngleDeg));
     // See SteppingAction's own comment: without this, G4ionIonisation's
     // effective-charge model silently drifts this ion's tracked charge
     // away from its real, fixed 4+ state, corrupting every bend downstream.

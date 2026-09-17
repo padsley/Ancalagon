@@ -1,6 +1,7 @@
 #include "PrimaryGeneratorAction.hh"
 
 #include <algorithm>
+#include <cmath>
 
 #include "G4Event.hh"
 #include "G4Gamma.hh"
@@ -8,6 +9,7 @@
 #include "G4Material.hh"
 #include "G4ParticleDefinition.hh"
 #include "G4ParticleTable.hh"
+#include "G4PhysicalConstants.hh"
 #include "G4PrimaryParticle.hh"
 #include "G4PrimaryVertex.hh"
 #include "G4SystemOfUnits.hh"
@@ -29,10 +31,12 @@ PrimaryGeneratorAction::PrimaryGeneratorAction(double x0Cm, double y0Cm, double 
 
 PrimaryGeneratorAction::PrimaryGeneratorAction(double x0Cm, double y0Cm, double momentumMeV,
                                                 double z0Cm, int ionZ, int ionA,
-                                                int ionChargeState)
+                                                int ionChargeState, double angleXDeg)
     : fNeedsIonLookup(true), fIonZ(ionZ), fIonA(ionA), fIonChargeState(ionChargeState) {
   fGun = new G4ParticleGun(1);
-  fGun->SetParticleMomentumDirection(G4ThreeVector(0.0, 0.0, 1.0));
+  const double angleXRad = angleXDeg * CLHEP::pi / 180.0;
+  fGun->SetParticleMomentumDirection(
+      G4ThreeVector(std::sin(angleXRad), 0.0, std::cos(angleXRad)));
   fGun->SetParticleMomentum(momentumMeV * MeV);
   fGun->SetParticlePosition(G4ThreeVector(x0Cm * cm, y0Cm * cm, z0Cm * cm));
 }
