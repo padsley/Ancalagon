@@ -1,0 +1,34 @@
+COMM 39K(p,gamma)40Ca single-gamma response-function calibration source
+COMM (added 2026-09-18, to fill the ~0.1-2.5 MeV true-gamma-energy gap
+COMM the Compton-continuum "top gamma only" model can't reach -- no run
+COMM in the cascade_*/cascade0p2_*/cascade3g*/cascade3g0p2* series has
+COMM its highest gamma below ~2.35 MeV, since each of those shares a
+COMM fixed total Ex across 2 or 3 gammas. This series sidesteps that by
+COMM using the same RECL-mass-excess-shift trick as
+COMM reactions/k39pg_40ca_cascade0p2_*.reaction (which shifts to the
+COMM real 0+_2 state), but shifted further so this file's own fictional
+COMM "ground" sits only 2.2000 MeV below the compound resonance --
+COMM see gamma_physics.py / fit_compton_continuum.py in
+COMM ~/data/Ancalagon_k39_emulator for how RECL is derived:
+COMM RECL(Ex_target) = BEAM_mass + TARG_mass - (Ex_target - ERES).
+COMM
+COMM Same beam/target/resonance physics as reactions/k39pg_40ca.reaction
+COMM otherwise (see that file for the full mass/kinematics derivation).
+COMM
+COMM THIS FILE: NO intermediate level and a single BRAT card sending the
+COMM resonance straight to this fictional ground state -- every event
+COMM emits EXACTLY ONE gamma, at 2.2000 MeV (before recoil-kinematics
+COMM corrections), no companion gamma at all. Unlike every other
+COMM topology in this project, there is no other gamma to exclude a
+COMM window for -- the whole spectrum from 0 up to this gamma's own
+COMM photopeak is this one gamma's true, uncontaminated response.
+COMM Verify with `--reaction-stats <this file>` (expect exactly 1 gamma
+COMM per event, 100% of the time).
+
+BEAM 19  39   -33.8072      # Z A massExcessMeV -- 39K
+TARG 1   1    7.28897       # 1H (target, at rest)
+RECL 20  40   -28.1122   8  # 40Ca, mass-excess shifted for Ex=2.2000 MeV
+ERES 0.606                  # CM resonance energy above threshold, MeV
+
+BRAT   -1  100.0   0        # resonance -> straight to (fictional) ground, 100%, single gamma
+SENT
