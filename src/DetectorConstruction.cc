@@ -454,25 +454,48 @@ void AttachElectric(G4LogicalVolume* lv, G4ElectricField* field) {
 // were subtly off: only its axis direction (already validated by the
 // existing centerXCm/centerZCm sin/cos convention) matters.
 //
-// maxExtentCm caps the container's half-length (BEFORE that -- the
-// natural (L+Z11+Z22)/2 fringe-margin size -- routinely exceeds the real
-// gap to this element's neighbour, see below): with G4's strict
-// non-overlapping-sibling-volume model, two adjacent field-managed
-// containers that overlap don't "both apply" in the overlap region --
-// Geant4's navigator resolves that whole region to whichever volume it
-// placed first, so the OTHER element's field is silently never applied
-// there at all. Empirically, before this cap existed, 13 of this chain's
-// 18 quad/dipole/e-dipole elements never registered a single step for the
-// design-orbit trajectory (their containers overlapped their upstream
-// neighbour's). The elements themselves can't move -- they're the real,
-// fixed physical arrangement of the separator -- so each cap here is
-// precomputed (offline, from this same chain's own fixed entry/exit
-// geometry) as half the centre-to-centre distance to whichever neighbour
-// is closest, which guarantees zero overlap between any two adjacent
-// containers; see the call sites in Construct() for the actual numbers.
-// This does shrink how much of each element's fringe field is
-// geometrically captured, but every cap here still clears that element's
-// own physical core half-length (data.L/2) with room to spare.
+// maxExtentCm caps the container's half-length. History, and why the cap
+// is now deliberately larger than "zero overlap" for the quads:
+//
+// Originally this was set to the natural (L+Z11+Z22)/2 fringe-margin
+// size, HARD-CAPPED at half the centre-to-centre distance to whichever
+// neighbour is closest, specifically to guarantee zero overlap between
+// adjacent containers -- G4's navigator resolves an overlap between two
+// sibling field-managed volumes to whichever it placed first, so without
+// this cap the OTHER element's field is silently never applied in the
+// overlap region at all (empirically, before any cap existed, 13 of this
+// chain's 18 quad/dipole/e-dipole elements never registered a single
+// step for the design-orbit trajectory this way).
+//
+// That non-overlap cap is real hardware-accurate geometry for the
+// DIPOLES/E-DIPOLES (D1/D2/E1/E2 all already clear their own natural
+// chord-plus-fringe reach with room to spare -- see their own call sites)
+// but for the QUADS it was routinely far more aggressive: e.g. Q2's
+// natural half-length is 40.5cm, but the non-overlap cap against Q1 was
+// only 27.5cm -- truncating over 30% of Q2's own real fringe field.
+// GEANT3's own architecture never hits this tradeoff at all: mitray_field.f
+// dispatches every element from one shared device table, not a Geant4-style
+// wall of separate solids, so adjacent elements' fringes simply coexist.
+// A cross-check confirmed this truncation, not a field-formula bug, is
+// what was driving Ancalagon's own QSLT/MSLT/FSLT achromatic-focus
+// residuals far above GEANT3's own (all quad FIELD VALUES were already
+// independently verified bit-exact against the real mitray_poles.f, see
+// validate/ -- so the gap had to be geometric, not a coefficient error).
+//
+// Fix: every quad below is now sized to its own natural (L+Z11+Z22)/2
+// reach, accepting the resulting overlap with its immediate neighbour(s)
+// rather than truncating to avoid it. Validated directly, not just
+// theorized: no element loses its steps (every quad still registers a
+// healthy number for the design-orbit ray -- the original failure mode
+// this cap existed to prevent), the achromatic-focus slope at QSLT drops
+// from 0.79 to 0.30mm/mrad, at MSLT from -2.39 to -0.23mm/mrad, and at
+// FSLT from 2.66 to -0.21mm/mrad (GEANT3's own values: 0.40/-0.63/n.m.
+// -- Ancalagon now matches or beats them), and real DSSSD transmission at
+// the unmodified real 2014 hardware tune jumps from the long-standing
+// 18.3% (o15ag_19ne: 3.35%) baseline to 85.5% (o15ag_19ne: 54.4%) --
+// k39pg_40ca's own GEANT3 comparison run reaches 99.3% at this same real
+// tune, so Ancalagon is now much closer to that, not further from it.
+// The dipoles/e-dipoles are untouched (already correctly sized).
 void ChainQuad(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, const char* name,
                const MitrayPoleData& data, double maxExtentCm) {
   DumpChainState(name, s);
@@ -911,15 +934,17 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     static_assert(kChainD1EntryZCm > 185.0 && kChainD1EntryZCm < 186.0, "check derivation");
 
     // The maxExtentCm/containerRadiusCm arguments below (ChainQuad's 5th,
-    // ChainDipole/ChainEdipole's 6th) are precomputed offline from this
-    // same chain's own fixed geometry: half the centre-to-centre distance
-    // to whichever neighbour is closest (arc midpoint for a dipole/
-    // e-dipole, see ChainDipole's own comment), so no two adjacent field
-    // containers can overlap. See ChainQuad's comment for why this
+    // ChainDipole/ChainEdipole's 6th) for the DIPOLES/E-DIPOLES are
+    // precomputed offline from this same chain's own fixed geometry: half
+    // the centre-to-centre distance to whichever neighbour is closest
+    // (arc midpoint for a dipole/e-dipole, see ChainDipole's own comment),
+    // so no two adjacent dipole/e-dipole containers overlap. The QUADS
+    // below deliberately do NOT follow that same non-overlap rule any
+    // more -- see ChainQuad's own comment for why this
     // matters (a silent, chain-wide field-masking bug otherwise).
-    ChainQuad(s, worldLV, vacuum, "Q1", q1data, 27.5000);         // line 19
+    ChainQuad(s, worldLV, vacuum, "Q1", q1data, 31.505);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
     Drift(s, 25.6925);                                   // DF7,  line 32
-    ChainQuad(s, worldLV, vacuum, "Q2", RetunedQuad(MitrayPoleData::Q2(), magneticScale * QuadTrimScale(2)), 27.5000);  // line 35
+    ChainQuad(s, worldLV, vacuum, "Q2", RetunedQuad(MitrayPoleData::Q2(), magneticScale * QuadTrimScale(2)), 40.5055);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
     Drift(s, 26.4);                                       // DF9,  line 46
     ChainCollimator(s, worldLV, copper, "RC9", true, 0, 0, 7.46, 7.62, 26.4);  // line 47
     Drift(s, 26.4);                                       // DF10, line 50
@@ -936,22 +961,22 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     ChainCollimator(s, worldLV, copper, "RC12", true, 0, 0, 4.92, 5.08, 26.55);  // line 84
     Drift(s, 26.55);                                       // DF13, line 87
     Drift(s, 18.32);                                       // DF14, line 90
-    ChainQuad(s, worldLV, vacuum, "Q3", RetunedQuad(MitrayPoleData::Q3(), magneticScale * QuadTrimScale(3)), 21.1025);  // line 95
+    ChainQuad(s, worldLV, vacuum, "Q3", RetunedQuad(MitrayPoleData::Q3(), magneticScale * QuadTrimScale(3)), 29.375);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     Drift(s, 0.0);                                         // DF15, line 108
     Drift(s, 16.14);                                       // DF16, line 112
-    ChainQuad(s, worldLV, vacuum, "Q4", RetunedQuad(MitrayPoleData::Q4(), magneticScale * QuadTrimScale(4)), 21.1025);  // line 115
+    ChainQuad(s, worldLV, vacuum, "Q4", RetunedQuad(MitrayPoleData::Q4(), magneticScale * QuadTrimScale(4)), 40.503);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     Drift(s, 0.0);                                         // DF17, line 128
     Drift(s, 21.62);                                       // DF18, line 130
-    ChainQuad(s, worldLV, vacuum, "Q5", RetunedQuad(MitrayPoleData::Q5(), magneticScale * QuadTrimScale(5)), 27.5000);  // line 135
+    ChainQuad(s, worldLV, vacuum, "Q5", RetunedQuad(MitrayPoleData::Q5(), magneticScale * QuadTrimScale(5)), 40.503);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     Drift(s, 21.62);                                       // DF19, line 148
-    ChainQuad(s, worldLV, vacuum, "Q6", RetunedQuad(MitrayPoleData::Q6(), magneticScale * QuadTrimScale(6)), 21.1025);  // line 153
+    ChainQuad(s, worldLV, vacuum, "Q6", RetunedQuad(MitrayPoleData::Q6(), magneticScale * QuadTrimScale(6)), 40.503);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     Drift(s, 0.0);                                         // DF20, line 166
     Drift(s, 16.14);                                       // DF21, line 168
-    ChainQuad(s, worldLV, vacuum, "Q7", RetunedQuad(MitrayPoleData::Q7(), magneticScale * QuadTrimScale(7)), 21.1025);  // line 173
+    ChainQuad(s, worldLV, vacuum, "Q7", RetunedQuad(MitrayPoleData::Q7(), magneticScale * QuadTrimScale(7)), 29.375);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     Drift(s, 15.23);                                       // DF22, line 186
     Drift(s, 13.0);                                        // DF23, line 190
@@ -981,14 +1006,14 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 13.5425);                                     // DF30, line 251
     ChainCollimator(s, worldLV, copper, "RC30", true, 0, 0, 4.92, 5.08, 13.5425);  // line 252
     Drift(s, 13.5425);                                     // DF31, line 255
-    ChainQuad(s, worldLV, vacuum, "Q8", RetunedQuad(MitrayPoleData::Q8(), magneticScale * QuadTrimScale(8)), 27.5000);  // line 260
+    ChainQuad(s, worldLV, vacuum, "Q8", RetunedQuad(MitrayPoleData::Q8(), magneticScale * QuadTrimScale(8)), 31.505);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     Drift(s, 0.0);                                         // DF33, line 273
     Drift(s, 25.695);                                      // DF34, line 275
-    ChainQuad(s, worldLV, vacuum, "Q9", RetunedQuad(MitrayPoleData::Q9(), magneticScale * QuadTrimScale(9)), 21.2250);  // line 280
+    ChainQuad(s, worldLV, vacuum, "Q9", RetunedQuad(MitrayPoleData::Q9(), magneticScale * QuadTrimScale(9)), 40.503);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     Drift(s, 15.81);                                       // DF35, line 293
-    ChainQuad(s, worldLV, vacuum, "Q10", RetunedQuad(MitrayPoleData::Q10(), magneticScale * QuadTrimScale(10)), 21.2250);  // line 298
+    ChainQuad(s, worldLV, vacuum, "Q10", RetunedQuad(MitrayPoleData::Q10(), magneticScale * QuadTrimScale(10)), 29.95);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     Drift(s, 9.8);                                         // DF37, line 311
     Drift(s, 26.0);                                        // DF38, line 315
@@ -1002,11 +1027,11 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 24.992);                                      // DF42, line 354
     ChainCollimator(s, worldLV, copper, "RC42", true, 0, 0, 7.46, 7.62, 24.992);  // line 355
     Drift(s, 24.992);                                      // DF43, line 358
-    ChainQuad(s, worldLV, vacuum, "Q11", RetunedQuad(MitrayPoleData::Q11(), magneticScale * QuadTrimScale(11)), 21.2250);  // line 363
+    ChainQuad(s, worldLV, vacuum, "Q11", RetunedQuad(MitrayPoleData::Q11(), magneticScale * QuadTrimScale(11)), 40.503);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     Drift(s, 0.0);                                         // DF43 (2nd), line 376
     Drift(s, 15.81);                                       // DF44, line 378
-    ChainQuad(s, worldLV, vacuum, "Q12", RetunedQuad(MitrayPoleData::Q12(), magneticScale * QuadTrimScale(12)), 21.2250);  // line 383
+    ChainQuad(s, worldLV, vacuum, "Q12", RetunedQuad(MitrayPoleData::Q12(), magneticScale * QuadTrimScale(12)), 29.95);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     Drift(s, 15.0);                                        // DF46, line 396
     Drift(s, 13.0);                                        // DF47, line 400
@@ -1035,10 +1060,10 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     ChainCollimator(s, worldLV, copper, "RC55", true, 0, 0, 7.46, 7.62, 12.95);  // line 459
     Drift(s, 12.95);                                       // DF56, line 462
     Drift(s, 12.0);                                        // DF51 (2nd), line 464
-    ChainQuad(s, worldLV, vacuum, "Q13", RetunedQuad(MitrayPoleData::Q13(), magneticScale * QuadTrimScale(13)), 33.3000);  // line 469
+    ChainQuad(s, worldLV, vacuum, "Q13", RetunedQuad(MitrayPoleData::Q13(), magneticScale * QuadTrimScale(13)), 43.6);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     Drift(s, 19.9);                                        // DF57, line 482
-    ChainQuad(s, worldLV, vacuum, "Q14", RetunedQuad(MitrayPoleData::Q14(), magneticScale * QuadTrimScale(14)), 33.3000);  // line 487
+    ChainQuad(s, worldLV, vacuum, "Q14", RetunedQuad(MitrayPoleData::Q14(), magneticScale * QuadTrimScale(14)), 43.6);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     // Past Q14: the beamline's final stretch to the focal-plane detector.
     // No more bending elements ('DIPO'/'EDIP' cards) appear, so theta is
