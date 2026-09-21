@@ -1,0 +1,20 @@
+COMM 39K(p,gamma)40Ca 2-gamma cascade, script-generated dense-grid
+COMM point (generate_reactions.py) -- terminus: real 0+_2 state (3.3526 MeV, E0-conversion terminus), e_budget =
+COMM 5.58117 MeV. Every level is a FICTIONAL placeholder, unused by
+COMM kinematics beyond fixing gamma energies (see ReactionConfig.hh's own LEVL
+COMM comment) -- same convention as every hand-written file in this directory.
+COMM 2-gamma dense interstitial point, L1=0.5500 MeV.
+COMM Levels (excitation above terminus, MeV): L1=0.5500
+COMM Gamma energies before recoil-kinematics corrections (MeV): gamma1=5.0312, gamma2=0.5500
+COMM Verify with `--reaction-stats <this file>`.
+
+BEAM 19  39   -33.8072     # Z A massExcessMeV -- 39K
+TARG 1   1    7.28897      # 1H (target, at rest)
+RECL 20  40   -31.4934    8  # 40Ca -- real 0+_2 state (3.3526 MeV, E0-conversion terminus)
+ERES 0.606                  # CM resonance energy above threshold, MeV
+
+LEVL   1   0.5500   1.0E-12   # fictional level 1
+
+BRAT   -1  100.0   1        # resonance -> highest level, 100%
+BRAT    1  100.0   0        # level 1 -> terminus, 100%
+SENT

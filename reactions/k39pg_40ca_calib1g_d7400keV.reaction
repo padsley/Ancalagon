@@ -1,0 +1,18 @@
+COMM 39K(p,gamma)40Ca 1-gamma cascade, script-generated dense-grid
+COMM point (generate_reactions.py) -- terminus: fictional single-gamma terminus at 7.4000 MeV excitation, e_budget =
+COMM 7.40000 MeV. Every level is a FICTIONAL placeholder, unused by
+COMM kinematics beyond fixing gamma energies (see ReactionConfig.hh's own LEVL
+COMM comment) -- same convention as every hand-written file in this directory.
+COMM Single-gamma calibration source, RECL(e_budget=7.40000)=-33.3122.
+COMM Levels (excitation above terminus, MeV): (none -- single gamma)
+COMM Gamma energies before recoil-kinematics corrections (MeV): gamma1=7.4000
+COMM Verify with `--reaction-stats <this file>`.
+
+BEAM 19  39   -33.8072     # Z A massExcessMeV -- 39K
+TARG 1   1    7.28897      # 1H (target, at rest)
+RECL 20  40   -33.31223   8  # 40Ca -- fictional single-gamma terminus at 7.4000 MeV excitation
+ERES 0.606                  # CM resonance energy above threshold, MeV
+
+
+BRAT   -1  100.0   0        # resonance -> terminus directly, 100%, single gamma
+SENT
