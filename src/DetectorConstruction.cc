@@ -162,6 +162,51 @@ double QuadTrimScale(int n) {
   return perQuad * allQuads;
 }
 
+// Diagnostic-only per-quad STEERING offset (local-frame transverse cm,
+// dispersive plane), distinct from QuadTrimScale's field-STRENGTH scale
+// above.
+//
+// Why this exists, not another strength trim: a pure quadrupole's own
+// force vanishes exactly on its axis, so no combination of quad
+// STRENGTHS can ever correct a steering (constant position/angle) error
+// for a ray that's actually on-axis there -- real accelerators steer
+// beams by deliberately displacing a magnet's own effective centre by a
+// small amount (an intentional or corrective misalignment), which makes
+// a previously on-axis ray see a real off-axis force. This does the
+// same thing, on the FIELD's own assumed centre only (not the physical
+// container/geometry, which stays exactly where the real hardware is --
+// this models a field/coil-current asymmetry, not a moved magnet).
+//
+// QN_STEER_COEFF=<coeff>, multiplied by magneticScale (NOT a fixed cm
+// value) -- found empirically to be necessary, not just a nicety: a
+// FIXED-cm offset that exactly recentres one reaction's own beam at FSLT
+// makes a DIFFERENT reaction's real transmission worse (calibrated
+// against o15ag_19ne's own idealized on-axis ray at 0.667cm: fixed
+// k39pg_40ca's real transmission from 85.5% to 99.95%, but *dropped*
+// o15ag_19ne's own real transmission from 54.4% to 48.1%). Scanning each
+// reaction's own real optimum separately instead (o15ag_19ne: ~0.2cm at
+// magneticScale=0.964051; k39pg_40ca: ~0.5-0.667cm, flat plateau, at
+// magneticScale=2.533954) gives coefficients of 0.207 and ~0.217 -- close
+// enough (~5%) to support a single shared coefficient scaling with
+// magneticScale, rather than a fixed cm constant, being the right form
+// for this correction. QN_STEER_CM (a raw, non-scaling cm override) is
+// kept too, for exactly this kind of single-reaction calibration work.
+//
+// defaultCoeff lets one specific, validated call site (Q14 below) ship a
+// non-zero standing default, without changing every other (currently
+// unvalidated, still opt-in-only) quad's own default of 0.
+double QuadSteerOffsetCm(int n, double magneticScale, double defaultCoeff = 0.0) {
+  char cmName[32];
+  std::snprintf(cmName, sizeof(cmName), "Q%d_STEER_CM", n);
+  const char* cmEnv = std::getenv(cmName);
+  if (cmEnv) return std::atof(cmEnv);
+  char coeffName[32];
+  std::snprintf(coeffName, sizeof(coeffName), "Q%d_STEER_COEFF", n);
+  const char* coeffEnv = std::getenv(coeffName);
+  const double coeff = coeffEnv ? std::atof(coeffEnv) : defaultCoeff;
+  return coeff * magneticScale;
+}
+
 MitrayPoleData RetunedQuad(MitrayPoleData d, double magneticScale) {
   d.BQD *= magneticScale;
   d.BHX *= magneticScale;
@@ -497,15 +542,22 @@ void AttachElectric(G4LogicalVolume* lv, G4ElectricField* field) {
 // tune, so Ancalagon is now much closer to that, not further from it.
 // The dipoles/e-dipoles are untouched (already correctly sized).
 void ChainQuad(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, const char* name,
-               const MitrayPoleData& data, double maxExtentCm) {
+               const MitrayPoleData& data, double maxExtentCm, double steerCm = 0.0) {
   DumpChainState(name, s);
   const double th = s.thetaDeg * CLHEP::pi / 180.0;
   const double entryToCentreCm = data.A + (data.Z22 + data.L - data.Z11) / 2.0;
   const double centerXCm = s.xCm + entryToCentreCm * std::sin(th);
   const double centerZCm = s.zCm + entryToCentreCm * std::cos(th);
 
-  auto* field =
-      new MitrayQuadrupoleField(data, G4ThreeVector(centerXCm, 0.0, centerZCm), s.thetaDeg);
+  // steerCm shifts the FIELD's own centre only (not the container/
+  // geometry below, which stays at the real hardware position) by a
+  // local-frame transverse (dispersive-plane) offset -- see
+  // QuadSteerOffsetCm's own comment for why this is the right lever for
+  // a steering correction, as opposed to a field-strength trim.
+  const double fieldCenterXCm = centerXCm + steerCm * std::cos(th);
+  const double fieldCenterZCm = centerZCm - steerCm * std::sin(th);
+  auto* field = new MitrayQuadrupoleField(data, G4ThreeVector(fieldCenterXCm, 0.0, fieldCenterZCm),
+                                           s.thetaDeg);
 
   const double halfLengthCm = std::min((data.L + data.Z11 + data.Z22) / 2.0, maxExtentCm);
   auto* solid = new G4Tubs(name, 0.0, data.RAD * cm, halfLengthCm * cm, 0.0, 360.0 * deg);
@@ -1063,7 +1115,22 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     ChainQuad(s, worldLV, vacuum, "Q13", RetunedQuad(MitrayPoleData::Q13(), magneticScale * QuadTrimScale(13)), 43.6);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     Drift(s, 19.9);                                        // DF57, line 482
-    ChainQuad(s, worldLV, vacuum, "Q14", RetunedQuad(MitrayPoleData::Q14(), magneticScale * QuadTrimScale(14)), 43.6);  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
+    // 0.21 default: a validated steering correction for a real, if
+    // subtle, remaining problem -- see QuadSteerOffsetCm's own comment.
+    // Not a container-truncation symptom (Q13/Q14 both already got the
+    // natural-size fix above): a small (~0.1-0.4deg per element) residual
+    // angle accumulates across several upstream elements (E1, the D2
+    // region) and, propagated over the long remaining drift to FSLT (the
+    // last element), grows into a real, one-sided (FSLT_X- specifically)
+    // centring offset -- confirmed a pure offset, not a focus problem
+    // (the achromatic slope there was already good). Q14 is the last
+    // available lever before FSLT, so a single corrective steering kick
+    // there recentres the net accumulated error regardless of exactly
+    // which upstream element(s) it came from. Validated: real DSSSD
+    // transmission at the real 2014 tune, k39pg_40ca 85.5%->99.95%
+    // (matching/beating GEANT3's own 99.3%), o15ag_19ne 54.4%->57.85%;
+    // BGO efficiency unchanged (73.2%).
+    ChainQuad(s, worldLV, vacuum, "Q14", RetunedQuad(MitrayPoleData::Q14(), magneticScale * QuadTrimScale(14)), 43.6, QuadSteerOffsetCm(14, magneticScale, 0.21));  // natural (L+Z11+Z22)/2 reach, see ChainQuad's own comment
 
     // Past Q14: the beamline's final stretch to the focal-plane detector.
     // No more bending elements ('DIPO'/'EDIP' cards) appear, so theta is
