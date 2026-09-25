@@ -4,7 +4,10 @@
 # z0 = 90 cm (inside Q1, past the target gas, where GEANT3's tracking
 # starts), x0 = 90 cm * tan(theta), i.e. as if from the target centre,
 # at the code's own tuned rigidity (GEANT3 0.9736, Ancalagon RTUN 0.9641,
-# times 258.72 MeV/c). Ancalagon's slits are opened so no ray stops early.
+# times 258.72 MeV/c). Ancalagon's slits are opened so no ray stops early,
+# and FINE_STEP_CM=0.5 keeps its printed steps short: with the World
+# carrying fields, a long step can curve, and the straight line between
+# two printed points then misstates position and angle near dipoles.
 # Usage: run_fans.sh <workdir> [G3 checkout]
 set -euo pipefail
 W=$(realpath -m "$1"); G=$(realpath "${2:-$HOME/codes/G3_DRAGON_Claude}")
@@ -29,7 +32,7 @@ mkdir -p "$W/g4"; cd "$W/g4"
 for a in $ANGLES; do
   x0=$(python3 -c "import math; print(f'{$Z0*math.tan($a*1e-3):.6f}')")
   deg=$(python3 -c "print($a*1e-3*180/3.141592653589793)")
-  REACTION_INPUT=$REPO/reactions/o15ag_19ne.reaction TRACK_CHAIN_ANGLE_DEG=$deg \
+  FINE_STEP_CM=0.5 REACTION_INPUT=$REPO/reactions/o15ag_19ne.reaction TRACK_CHAIN_ANGLE_DEG=$deg \
   QSLT_HALFGAP_X_CM=20 QSLT_HALFGAP_Y_CM=20 MSLT_HALFGAP_X_CM=20 MSLT_HALFGAP_Y_CM=20 \
     "$REPO/build/Ancalagon" --track-chain "$x0" 0.0 $P4 1 $Z0 2>&1 | grep "^TRAJ" > "$HERE/ancalagon/ray.$a.txt"
 done

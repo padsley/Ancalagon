@@ -1,19 +1,16 @@
-Ancalagon after the quad field-origin and field-superposition fixes (2026-09-25),
+Ancalagon after all 2026-09-25 fixes (quad field origin, field superposition,
+dipole/e-dipole natural field regions on the World, D2 trim off, Q14 steer 0),
 real 2014 tune (MSLT 0.75 x 1.25 cm), 10k --track-reaction events, RANDOM_SEED=12345.
-Recoil's final volume (count):
-== o15ag_19ne
-   9624 DSSSD
-    116 EX5C
-     76 EX3C
-     46 QSLT_X+
-     30 MSLT_X+
-     26 PDE1
-     21 PDI3
-     18 PDH3
-== k39pg_40ca
-   9999 DSSSD
-      1 EX3C
+Global frame, relative to the final-drift axis x = -1024.717 cm.
 
-FSLT x of transmitted recoils (4k events, RANDOM_SEED=777), Q14 steering default 0.21 vs 0:
-  o15ag_19ne: steer 0.21 mean +0.267 rms 0.275 cm | steer 0 mean +0.616 rms 0.274 cm | GEANT3 mean -0.222 rms 0.206 cm
-  k39pg_40ca: steer 0.21 mean -0.337 rms 0.106 cm | steer 0 mean +0.579 rms 0.103 cm | GEANT3 mean -0.288 rms 0.125 cm
+reaction      DSSSD    QSLT/MSLT/FSLT lost   FSLT x mean/rms   DSSSD x mean/rms   x' at DSSSD
+o15ag_19ne    96.32%   43 / 28 / 0           +0.440 / 0.249    +0.141 / 0.625     -4.52 mrad
+k39pg_40ca    99.99%    0 /  0 / 0           +0.371 / 0.056    +0.153 / 0.269     -3.28 mrad
+
+GEANT3 (same tune):
+o15ag_19ne    82.3%    QSLT 8.2%, MSLT 0.9%, FSLT 0.1%, target 7.1%   FSLT x -0.222 / 0.206   x' -1.79 mrad
+k39pg_40ca    99.39%                                                 FSLT x -0.288 / 0.125   DSSSD x -0.365 / 0.318, x' -1.16 mrad
+
+Same runs with the old Q14 steering (Q14_STEER_COEFF=0.21): transmission identical;
+o15ag FSLT x +0.088, x' -6.88 mrad; k39pg FSLT x -0.550, DSSSD x -1.188, x' -9.62 mrad.
+The remaining o15ag transmission gap is GEANT3's beam emittance (Ancalagon fires from a point).

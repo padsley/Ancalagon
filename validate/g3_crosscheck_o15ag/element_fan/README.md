@@ -31,16 +31,41 @@ Two Ancalagon bugs, found in this order:
    magnetic element whose container holds the point
    (`FIELD_SUPERPOSITION=0` restores the old behaviour).
 
-| (x\|θ) mm/mrad | GEANT3 | before | origin fix | both fixes |
-|---|---|---|---|---|
-| RC9 | +2.691 | +3.213 | +2.718 | +2.691 |
-| QSLT | −0.004 | −0.105 | +0.063 | +0.015 |
-| RC23 | −2.746 | −3.148 | −3.339 | −2.693 |
-| MSLT | +0.007 | +0.735 | −0.769 | +0.024 |
-| FSLT | −0.021 | +2.592 | −1.574 | −0.192 |
+3. **Dipole fringe truncation** (follow-up, same day). D1's and D2's
+   containers are capped to keep clear of neighbouring collimators, which
+   cut ~14 cm off D1's 30 cm fringes (its on-axis ray left D1 1.6 mrad off
+   GEANT3's). Each dipole and e-dipole now registers an unplaced
+   natural-reach field region with the sum, and the World carries the
+   summed field (a `G4ElectroMagneticField`, so B and E add), so fringes act
+   in the gaps without any container swallowing a slit. The target chamber
+   and BGO volumes are reset to no field.
 
-Still open: after D2 a smaller residual remains ((a|θ) 9 % high at RC40,
-−0.19 mm/mrad at FSLT), and the on-axis ray leaves D1 about 1.6 mrad
-different from GEANT3's (1.9 mm off at MSLT). The Q14 steering correction
-(0.21) and the D2 residual trim were calibrated against the buggy optics and
-need re-deriving.
+4. **Corrections tuned on the old optics.** `kD2ResidualTrim` (2.6 %)
+   compensated D2's truncated fringe and now over-bends (on-axis ray 3.6 cm
+   off at RC40), so it applies only with `FIELD_SUPERPOSITION=0`. The Q14
+   steering default (0.21) moves the beam away from GEANT3 once the rest is
+   fixed (k39pg_40ca mean angle at the DSSSD −9.6 mrad with it, −3.3 without,
+   GEANT3 −1.2) and no single value matches both reactions, so its default
+   is now 0 (0.21 in legacy mode; `Q14_STEER_COEFF` still overrides).
+
+| (x\|θ) mm/mrad | GEANT3 | before | origin fix | + superposition | all fixes (final) |
+|---|---|---|---|---|---|
+| RC9 | +2.691 | +3.213 | +2.718 | +2.691 | +2.691 |
+| QSLT | −0.004 | −0.105 | +0.063 | +0.015 | −0.003 |
+| RC23 | −2.746 | −3.148 | −3.339 | −2.693 | −2.744 |
+| MSLT | +0.007 | +0.735 | −0.769 | +0.024 | +0.006 |
+| RC40 | −0.100 | −0.838 | +0.765 | +0.058 | −0.102 |
+| FSLT | −0.021 | +2.592 | −1.574 | −0.192 | +0.052 |
+
+The final column uses fine-stepped Ancalagon rays (`FINE_STEP_CM=0.5`, now
+in `run_fans.sh`); the earlier columns were coarse-stepped, which is exact
+only where the World carried no field. (a|θ) also agrees to <1 % through
+RC40, 5–8 % after E2.
+
+Still open: the on-axis ray is 0.6 mm apart at RC40 and 5.7 mm apart by
+RC55. Through E2 its direction runs a constant 24 mrad ahead of GEANT3's,
+i.e. Ancalagon's E2 bend starts ~6 cm earlier along the path, although both
+codes put E2's entrance EFB at the same chain position and bend at the same
+radius. GEANT3 builds its e-dipole volume and A-frame from a trapezoid
+construction (`ugeo_edipol` in `ugeom_mitray.f`) that may place the A-frame
+differently from the deck; not yet traced. E1 (smaller bend) agrees.
