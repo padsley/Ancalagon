@@ -1,4 +1,4 @@
-<title>Ancalagon vs GEANT3: 39K(p,γ)40Ca</title>
+<title>Ancalagon vs GEANT3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
@@ -83,6 +83,8 @@ figcaption b{color:var(--ink);font-weight:600}
 .tip .r{display:flex;align-items:center;gap:8px;justify-content:space-between}
 .tip .r i{display:inline-block;width:12px;height:2px;border-radius:1px;margin-right:6px}
 .tip .r b{font:500 12px var(--mono)}
+.part{border-top:2px solid var(--ink);padding-top:22px;gap:6px}
+.part h2{font-size:32px}
 .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
 ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
 li{color:var(--ink-2)} li b{color:var(--ink);font-weight:600}
@@ -95,19 +97,59 @@ pre{margin:0;overflow-x:auto;background:var(--surface);border:1px solid var(--ru
 <div class="wrap">
   <header>
     <div class="eyebrow">DRAGON · Ancalagon validation</div>
-    <h1>Ancalagon vs GEANT3: 39K(p,γ)40Ca</h1>
-    <p class="lede col">A full-distribution comparison of the GEANT4 port against the GEANT3 DRAGON simulation at the real 2014 hardware tune. Transmission and the BGO array agree closely. The final horizontal focus at FSLT does not.</p>
+    <h1>Ancalagon vs GEANT3</h1>
+    <p class="lede col">A full-distribution comparison of the GEANT4 port against the GEANT3 DRAGON simulation, for two reactions at the real 2014 hardware tune. For 15O(α,γ)19Ne the codes disagree badly: GEANT3 transmits 82 % of recoils and Ancalagon 51 %. The cause is the same in both reactions: Ancalagon does not form the angle-independent foci at MSLT and FSLT that GEANT3 does.</p>
     <div class="meta">
-      <span><b>Reaction</b> E<sub>r</sub>(cm) = 606 keV, single 8.934 MeV γ, 40Ca<sup>8+</sup></span>
       <span><b>Tune</b> dragon_2014_DSSSD, MSLT 0.75 × 1.25 cm</span>
-      <span><b>Events</b> 10 000 per code</span>
+      <span><b>Events</b> 10 000 per code per reaction</span>
       <span><b>Run</b> 2026-09-25, Ancalagon main @ 50c50e2</span>
     </div>
   </header>
 
+  <section class="part">
+    <div class="eyebrow">Reaction 1 · 19Ne<sup>4+</sup>, E<sub>r</sub>(cm) = 503.6 keV, 5 Torr He</div>
+    <h2>15O(α,γ)19Ne</h2>
+  </section>
+
   <section>
     <div class="verdict">
-      <div class="v"><span class="chip note"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Close</span><h3>Transmission</h3><p>99.39 % in GEANT3 against 99.97 % in Ancalagon. Both are near 100 %, but the 0.6-point gap is 7σ: GEANT3 loses 58 reacting recoils to Ancalagon's 3. Where GEANT3 loses them has not been traced.</p></div>
+      <div class="v"><span class="chip bad"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Disagrees</span><h3>Transmission</h3><p>82.3 % in GEANT3 against 51.2 % in Ancalagon, per reacting event.</p></div>
+      <div class="v"><span class="chip bad"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Disagrees</span><h3>Focus at MSLT</h3><p>GEANT3's (x|θ) at the mass slit is +0.03 mm/mrad. Ancalagon's is +0.79 mm/mrad, so wide-angle recoils hit the jaws.</p></div>
+      <div class="v"><span class="chip note"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Input difference</span><h3>QSLT and target losses</h3><p>GEANT3 loses 15 % here against Ancalagon's 4 %, consistent with its finite beam spot and divergence, which Ancalagon does not model.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where the recoils end up</h2>
+    <div class="tablewrap"><table id="t-fate"><thead><tr><th>Final location</th><th class="n"><span class="key g3"></span>GEANT3</th><th class="n"><span class="key g4"></span>Ancalagon</th></tr></thead><tbody></tbody></table></div>
+    <p class="col">Percent of reacting events. Ancalagon reports the volume each recoil stopped in; GEANT3's stopping points are assigned to the nearest element of the same beamline geometry. Ancalagon's MSLT losses split 25.4 % on the X− jaw and 14.4 % on X+.</p>
+  </section>
+
+  <section>
+    <h2>The mass slit is not an angle focus in Ancalagon</h2>
+    <p class="col">MSLT is designed so that a recoil's position there does not depend on its angle leaving the target. The 19Ne cone reaches about 16 mrad, compared with about 7 mrad for 40Ca in 39K(p,γ)40Ca, so any residual angle term matters much more here. In Ancalagon, MSLT losses rise with angle: 0.6 % below 4 mrad, 8 % at 4–8, 30 % at 8–12 and 55 % beyond 12 mrad.</p>
+    <figure>
+      <div class="fighead"><h3>Mean x at MSLT against recoil angle</h3><div class="legend"><span><span class="key g3"></span>GEANT3 (1 262 recoils)</span><span><span class="key g4"></span>Ancalagon (1 139 recoils)</span></div></div>
+      <div class="chart" id="c-mslt"></div>
+      <figcaption><b>GEANT3 is flat across ±16 mrad; Ancalagon slopes by 0.79 mm/mrad and reaches the jaws.</b> Mean horizontal position where each code's own recoils cross the MSLT plane, in 4 mrad bins of the horizontal angle just after the target. The dashed lines are the jaws at ±0.75 cm. Ancalagon's outer bins are biased inward, because recoils that hit the jaws never cross the plane.</figcaption>
+    </figure>
+    <div class="tablewrap"><table id="t-fit"><thead><tr><th>From each code's own recoils</th><th class="n"><span class="key g3"></span>GEANT3</th><th class="n"><span class="key g4"></span>Ancalagon</th></tr></thead><tbody></tbody></table></div>
+    <ul class="col">
+      <li><b>A clean single-ray fan agrees.</b> 19Ne<sup>4+</sup> rays fired from past the target gas give (x|θ) ≈ +0.8 mm/mrad at MSLT, with the on-axis ray 1.9 mm off centre. They are exactly linear at Q1, so the error builds up downstream.</li>
+      <li><b>Fans must start past the target gas.</b> Fired from the target centre, each single ray picks up a random 2–3 mrad multiple-scattering kick in its first step. An earlier 19Ne fan that looked discontinuous was showing exactly that.</li>
+      <li><b>The tunes differ by 1 %.</b> GEANT3 scales the magnets by 0.9736 and Ancalagon by 0.9641 (RTUN), against 0.07 % for 39K(p,γ)40Ca. A tune offset shifts positions but does not create an angle term, so it does not explain the slope.</li>
+      <li><b>GEANT3's built-in 15O(α,γ)19Ne cannot be used.</b> Its 0.275 and 0.238 MeV states decay to an undefined particle (95). This comparison uses a file-driven copy, <code>o15ag.dat</code>, with the same levels, lifetimes and branching ratios as Ancalagon.</li>
+    </ul>
+  </section>
+
+  <section class="part">
+    <div class="eyebrow">Reaction 2 · 40Ca<sup>8+</sup>, E<sub>r</sub>(cm) = 606 keV, single 8.934 MeV γ, 5 Torr H<sub>2</sub></div>
+    <h2>39K(p,γ)40Ca</h2>
+  </section>
+
+  <section>
+    <div class="verdict">
+      <div class="v"><span class="chip good"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Agrees</span><h3>Transmission</h3><p>99.39 % in GEANT3 against 99.97 % in Ancalagon. The 0.6-point gap is statistically resolved but immaterial for DRAGON transmission.</p></div>
       <div class="v"><span class="chip good"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Agrees</span><h3>BGO array</h3><p>Hit fraction, spectrum shape and crystal multiplicity match. Ancalagon runs about 1 point high on every efficiency, which is 1–2.5σ.</p></div>
       <div class="v"><span class="chip bad"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Disagrees</span><h3>Final focus at FSLT</h3><p>GEANT3 focuses at FSLT to 0.12 cm rms. Ancalagon is 1.07 cm rms there, driven by an uncorrected (x|θ) = −2.5 mm/mrad.</p></div>
     </div>
@@ -141,7 +183,7 @@ pre{margin:0;overflow-x:auto;background:var(--surface);border:1px solid var(--ru
       <figure>
         <div class="fighead"><h3>Single-ray angle fan (Ancalagon)</h3></div>
         <div class="chart" id="c-fan"></div>
-        <figcaption>x at FSLT for single recoils fired from the target centre at a set horizontal angle. A true focus would be a flat line. <span class="key g4"></span>40Ca<sup>8+</sup> at 1320 MeV/c (solid), 19Ne<sup>4+</sup> at 258 MeV/c for o15ag_19ne (dashed).</figcaption>
+        <figcaption>x at FSLT for single recoils fired from the target centre at a set horizontal angle. A true focus would be a flat line. <span class="key g4"></span>40Ca<sup>8+</sup> at 1320 MeV/c.</figcaption>
       </figure>
     </div>
     <div class="stack col">
@@ -149,9 +191,9 @@ pre{margin:0;overflow-x:auto;background:var(--surface);border:1px solid var(--ru
       <ul>
         <li><b>The width is an angle term.</b> A fit of x at FSLT to the initial recoil angle and momentum over 3 000 real recoils gives (x|θ) = −2.53 mm/mrad. It leaves 0.11 cm rms unexplained. Dispersion (about 0.9 cm per 1 % in dp/p) contributes little.</li>
         <li><b>Single rays agree with the population.</b> The 40Ca<sup>8+</sup> fan is linear at −2.56 mm/mrad, and its on-axis ray lands 3.4 mm off centre.</li>
-        <li><b>It is not specific to this reaction.</b> 19Ne<sup>4+</sup> rays for o15ag_19ne show about −2.5 mm/mrad too, plus a 1.5 cm jump between −1 and 0 mrad. That jump looks like a boundary between overlapping quad field volumes.</li>
+        <li><b>It is not specific to this reaction.</b> 19Ne<sup>4+</sup> recoils in 15O(α,γ)19Ne show the same kind of residual angle term, at both MSLT and FSLT (see above).</li>
         <li><b>This contradicts the 2026-09-20 validation</b>, which recorded −0.21 mm/mrad at FSLT after the quad-container fix. That figure does not reproduce with real-species rays fired from the target.</li>
-        <li><b>Consequence:</b> transmission is unaffected only because FSLT and the DSSSD are wide. Ancalagon's DSSSD position and angle distributions should not be used until this is fixed. It may also contribute to the 58 % o15ag_19ne transmission; that has not been checked.</li>
+        <li><b>Consequence:</b> transmission is unaffected only because FSLT and the DSSSD are wide. Ancalagon's DSSSD position and angle distributions should not be used until this is fixed. For 15O(α,γ)19Ne, with its wider cone, the same problem at MSLT does cost transmission (see above).</li>
       </ul>
     </div>
   </section>
@@ -185,6 +227,7 @@ python3 analyze.py             # results/summary.txt, compare.png, chart_data.js
 
 <script>
 const DATA = __DATA__;
+const O15 = __O15__;
 const $ = (s) => document.querySelector(s);
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const fmt = (v, d) => (v >= 0 ? "" : "−") + Math.abs(v).toFixed(d);
@@ -223,6 +266,17 @@ const fmt = (v, d) => (v >= 0 ? "" : "−") + Math.abs(v).toFixed(d);
   }
 })();
 
+(function () {
+  const put = (tb, cells) => { const tr = document.createElement("tr"); cells.forEach((t, i) => { const td = document.createElement("td"); td.textContent = t; if (i) td.className = "n"; tr.appendChild(td); }); tb.appendChild(tr); };
+  const tf = $("#t-fate tbody");
+  for (const r of O15.fates) put(tf, [r.label, r.g3[0].toFixed(1) + " ± " + r.g3[1].toFixed(1) + " %", r.g4[0].toFixed(1) + " ± " + r.g4[1].toFixed(1) + " %"]);
+  const tt = $("#t-fit tbody"), F = O15.fit;
+  for (const k of ["MSLT", "FSLT"]) {
+    put(tt, [k + ": (x|θ) slope", fmt(F.GEANT3[k].slope_mm_per_mrad, 2) + " mm/mrad", fmt(F.Ancalagon[k].slope_mm_per_mrad, 2) + " mm/mrad"]);
+    put(tt, [k + ": x rms", F.GEANT3[k].rms_cm.toFixed(2) + " cm", F.Ancalagon[k].rms_cm.toFixed(2) + " cm"]);
+  }
+})();
+
 // minimal chart kit: line/step series, one y-scale, crosshair tooltip
 function chart(el, o) {
   const W = o.w || 900, Hh = o.h || 320, m = { l: 56, r: 16, t: 14, b: 44 };
@@ -247,6 +301,10 @@ function chart(el, o) {
   }
   const xl = mk("text", { x: m.l + pw / 2, y: Hh - 4, "text-anchor": "middle", class: "lab" }); xl.textContent = o.xlabel;
   const yl = mk("text", { x: 14, y: m.t + ph / 2, "text-anchor": "middle", class: "lab", transform: `rotate(-90 14 ${m.t + ph / 2})` }); yl.textContent = o.ylabel;
+  for (const h of o.hlines || []) {
+    mk("line", { x1: m.l, x2: m.l + pw, y1: Y(h.y), y2: Y(h.y), class: "marker" });
+    const t = mk("text", { x: m.l + pw - 4, y: Y(h.y) - 5, "text-anchor": "end", class: "lab" }); t.textContent = h.label;
+  }
   for (const mkr of o.markers || []) {
     mk("line", { x1: X(mkr.x), x2: X(mkr.x), y1: m.t, y2: m.t + ph, class: "marker" });
     const t = mk("text", { x: X(mkr.x) + 5, y: m.t + 12, class: "lab" }); t.textContent = mkr.label;
@@ -286,7 +344,18 @@ const nearest = (arr, v) => { let b = 0; for (let i = 1; i < arr.length; i++) if
 const steps = (edges, vals) => { const p = []; vals.forEach((v, i) => { p.push([edges[i], v], [edges[i + 1], v]); }); return p; };
 
 function draw() {
-  for (const id of ["#c-waist", "#c-prof", "#c-fan", "#c-bgo"]) $(id).replaceChildren();
+  for (const id of ["#c-waist", "#c-prof", "#c-fan", "#c-bgo", "#c-mslt"]) $(id).replaceChildren();
+  const ms = O15.mslt, mb = [...new Set([...ms.g3.map((p) => p[0]), ...ms.g4.map((p) => p[0])])].sort((a, b) => a - b);
+  chart($("#c-mslt"), {
+    h: 320, aria: "Mean x at MSLT against recoil angle for GEANT3 and Ancalagon",
+    x: [-17, 17], y: [-1, 1], xt: [-16, -12, -8, -4, 0, 4, 8, 12, 16], yt: [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1], yf: (t) => t.toFixed(2),
+    xlabel: "horizontal recoil angle after the target (mrad)", ylabel: "mean x at MSLT (cm)",
+    hlines: [{ y: 0.75, label: "jaw +0.75" }, { y: -0.75, label: "jaw −0.75" }],
+    series: [{ color: "--g3", pts: ms.g3, dots: true }, { color: "--g4", pts: ms.g4, dots: true }],
+    snap: (v) => { const a = mb[nearest(mb, v)]; const g = ms.g3.find((p) => p[0] === a), h = ms.g4.find((p) => p[0] === a);
+      const rows = []; if (g) rows.push({ name: "GEANT3", color: "--g3", val: fmt(g[1], 3) + " cm" }); if (h) rows.push({ name: "Ancalagon", color: "--g4", val: fmt(h[1], 3) + " cm" });
+      return { x: a, head: (a - 2) + " to " + (a + 2) + " mrad", rows }; },
+  });
   const w = DATA.waist;
   chart($("#c-waist"), {
     aria: "Horizontal beam rms against distance downstream of FSLT for GEANT3 and Ancalagon",
@@ -307,14 +376,14 @@ function draw() {
     snap: (v) => { const i = nearest(ctr, v); return { x: ctr[i], head: "x = " + pr.edges[i].toFixed(1) + " to " + pr.edges[i + 1].toFixed(1) + " cm",
       rows: [{ name: "GEANT3", color: "--g3", val: (100 * pr.g3[i]).toFixed(1) + " %" }, { name: "Ancalagon", color: "--g4", val: (100 * pr.g4[i]).toFixed(1) + " %" }] }; },
   });
-  const f = DATA.fan, angs = [...new Set([...f.ca.map((p) => p[0]), ...f.ne.map((p) => p[0])])].sort((a, b) => a - b);
+  const f = DATA.fan, angs = f.ca.map((p) => p[0]);
   chart($("#c-fan"), {
     w: 460, h: 300, aria: "Ancalagon x at FSLT against initial angle for 40Ca8+ and 19Ne4+ single rays",
     x: [-4.5, 4.5], y: [-1, 1.6], xt: [-4, -2, 0, 2, 4], yt: [-1, -0.5, 0, 0.5, 1, 1.5], yf: (t) => t.toFixed(1),
     xlabel: "initial horizontal angle (mrad)", ylabel: "x at FSLT (cm)",
-    series: [{ color: "--g4", pts: f.ca, dots: true }, { color: "--g4", pts: f.ne, dots: true, hollow: true, dash: "5 4", w: 1.5 }],
+    series: [{ color: "--g4", pts: f.ca, dots: true }],
     snap: (v) => { const a = angs[nearest(angs, v)]; const c = f.ca.find((p) => p[0] === a), n = f.ne.find((p) => p[0] === a);
-      const rows = []; if (c) rows.push({ name: "40Ca⁸⁺", color: "--g4", val: fmt(c[1], 3) + " cm" }); if (n) rows.push({ name: "19Ne⁴⁺", color: "--g4", val: fmt(n[1], 3) + " cm" });
+      const rows = []; if (c) rows.push({ name: "40Ca⁸⁺", color: "--g4", val: fmt(c[1], 3) + " cm" });
       return { x: a, head: (a > 0 ? "+" : a < 0 ? "−" : "") + Math.abs(a) + " mrad", rows }; },
   });
   const b = DATA.bgo, bc = b.edges.slice(0, -1).map((e, i) => (e + b.edges[i + 1]) / 2);

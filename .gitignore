@@ -20,3 +20,7 @@ validate/*_cpp_reference.csv
 
 # Analysis output (see README.md's "ROOT output")
 *.root
+
+# Raw recoil-track captures for validate/*/plane_fit.py (large, regenerable;
+# reduced to plane_points.csv, which is kept)
+validate/*/data/*/planes.txt

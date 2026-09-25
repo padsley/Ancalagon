@@ -1,0 +1,58 @@
+# Input namelist for 15O(a,g)19Ne, Er(cm)=503.6 keV (Ex = 4.03 MeV) --
+# file-driven (FKIN 20) copy of GEANT3's built-in reaction 2, made for the
+# Ancalagon cross-check, because the built-in one's 0.275 and 0.238 MeV
+# states decay (mode 1+100*95) to particle 95, which ureact.f never
+# defines (the 19Ne ground state is particle 85).
+#
+# Mirrors Ancalagon's reactions/o15ag_19ne.reaction: same mass excesses,
+# levels, lifetimes and branching ratios (identical to GEANT3's case 2),
+# and the same total width, RWID = 50.6 eV (split here as a nominal
+# gamma width plus the remainder; only the sum sets tlif, and both are
+# far narrower than the beam's energy loss across the gas).
+#
+# Level index -> state:  0 g.s., 1 = 0.238 (5/2+), 2 = 0.275 (1/2-),
+# 3 = 1.536 (3/2+), 4 = resonance (Ex = Q + Er = 3.529 + 0.504).
+ &params
+  life = 15*1000.
+  level = 15*0.
+  beamtyp = '15O'
+  rectyp = '19Ne'
+  zbeam = 8.
+  abeam = 15.
+  atarg = 4.
+  ztarg = 2.
+  zprod = 10.
+  beamlifetime = 122.2
+  beam_mass_excess = 2855.4E-06
+  recoil_mass_excess = 1751.1E-06
+  resenerg = 0.5036
+  part_width = 0.0000006
+  gam_width = 0.00005
+  spin_stat_fac = 1.0
+  ell = 0.
+  rstate = 4
+  level( 0) = 0.0
+  level( 1) = 0.238
+  level( 2) = 0.275
+  level( 3) = 1.536
+  level( 4) = 4.033
+  life( 0) = 1000.
+  life( 1) = 2.6E-8
+  life( 2) = 6.3E-11
+  life( 3) = 2.8E-11
+  life( 4) = 1.0E-17
+  br(4,1) = 80.
+  md(4,1) = 0
+  br(4,2) = 15.
+  md(4,2) = 2
+  br(4,3) = 5.
+  md(4,3) = 3
+  br(3,1) = 95.
+  md(3,1) = 1
+  br(3,2) = 5.
+  md(3,2) = 2
+  br(2,1) = 100.
+  md(2,1) = 0
+  br(1,1) = 100.
+  md(1,1) = 0
+/

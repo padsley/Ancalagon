@@ -1,4 +1,4 @@
-<title>Ancalagon vs GEANT3: 39K(p,γ)40Ca</title>
+<title>Ancalagon vs GEANT3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
@@ -83,6 +83,8 @@ figcaption b{color:var(--ink);font-weight:600}
 .tip .r{display:flex;align-items:center;gap:8px;justify-content:space-between}
 .tip .r i{display:inline-block;width:12px;height:2px;border-radius:1px;margin-right:6px}
 .tip .r b{font:500 12px var(--mono)}
+.part{border-top:2px solid var(--ink);padding-top:22px;gap:6px}
+.part h2{font-size:32px}
 .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
 ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
 li{color:var(--ink-2)} li b{color:var(--ink);font-weight:600}
@@ -95,19 +97,59 @@ pre{margin:0;overflow-x:auto;background:var(--surface);border:1px solid var(--ru
 <div class="wrap">
   <header>
     <div class="eyebrow">DRAGON · Ancalagon validation</div>
-    <h1>Ancalagon vs GEANT3: 39K(p,γ)40Ca</h1>
-    <p class="lede col">A full-distribution comparison of the GEANT4 port against the GEANT3 DRAGON simulation at the real 2014 hardware tune. Transmission and the BGO array agree closely. The final horizontal focus at FSLT does not.</p>
+    <h1>Ancalagon vs GEANT3</h1>
+    <p class="lede col">A full-distribution comparison of the GEANT4 port against the GEANT3 DRAGON simulation, for two reactions at the real 2014 hardware tune. For 15O(α,γ)19Ne the codes disagree badly: GEANT3 transmits 82 % of recoils and Ancalagon 51 %. The cause is the same in both reactions: Ancalagon does not form the angle-independent foci at MSLT and FSLT that GEANT3 does.</p>
     <div class="meta">
-      <span><b>Reaction</b> E<sub>r</sub>(cm) = 606 keV, single 8.934 MeV γ, 40Ca<sup>8+</sup></span>
       <span><b>Tune</b> dragon_2014_DSSSD, MSLT 0.75 × 1.25 cm</span>
-      <span><b>Events</b> 10 000 per code</span>
+      <span><b>Events</b> 10 000 per code per reaction</span>
       <span><b>Run</b> 2026-09-25, Ancalagon main @ 50c50e2</span>
     </div>
   </header>
 
+  <section class="part">
+    <div class="eyebrow">Reaction 1 · 19Ne<sup>4+</sup>, E<sub>r</sub>(cm) = 503.6 keV, 5 Torr He</div>
+    <h2>15O(α,γ)19Ne</h2>
+  </section>
+
   <section>
     <div class="verdict">
-      <div class="v"><span class="chip note"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Close</span><h3>Transmission</h3><p>99.39 % in GEANT3 against 99.97 % in Ancalagon. Both are near 100 %, but the 0.6-point gap is 7σ: GEANT3 loses 58 reacting recoils to Ancalagon's 3. Where GEANT3 loses them has not been traced.</p></div>
+      <div class="v"><span class="chip bad"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Disagrees</span><h3>Transmission</h3><p>82.3 % in GEANT3 against 51.2 % in Ancalagon, per reacting event.</p></div>
+      <div class="v"><span class="chip bad"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Disagrees</span><h3>Focus at MSLT</h3><p>GEANT3's (x|θ) at the mass slit is +0.03 mm/mrad. Ancalagon's is +0.79 mm/mrad, so wide-angle recoils hit the jaws.</p></div>
+      <div class="v"><span class="chip note"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Input difference</span><h3>QSLT and target losses</h3><p>GEANT3 loses 15 % here against Ancalagon's 4 %, consistent with its finite beam spot and divergence, which Ancalagon does not model.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where the recoils end up</h2>
+    <div class="tablewrap"><table id="t-fate"><thead><tr><th>Final location</th><th class="n"><span class="key g3"></span>GEANT3</th><th class="n"><span class="key g4"></span>Ancalagon</th></tr></thead><tbody></tbody></table></div>
+    <p class="col">Percent of reacting events. Ancalagon reports the volume each recoil stopped in; GEANT3's stopping points are assigned to the nearest element of the same beamline geometry. Ancalagon's MSLT losses split 25.4 % on the X− jaw and 14.4 % on X+.</p>
+  </section>
+
+  <section>
+    <h2>The mass slit is not an angle focus in Ancalagon</h2>
+    <p class="col">MSLT is designed so that a recoil's position there does not depend on its angle leaving the target. The 19Ne cone reaches about 16 mrad, compared with about 7 mrad for 40Ca in 39K(p,γ)40Ca, so any residual angle term matters much more here. In Ancalagon, MSLT losses rise with angle: 0.6 % below 4 mrad, 8 % at 4–8, 30 % at 8–12 and 55 % beyond 12 mrad.</p>
+    <figure>
+      <div class="fighead"><h3>Mean x at MSLT against recoil angle</h3><div class="legend"><span><span class="key g3"></span>GEANT3 (1 262 recoils)</span><span><span class="key g4"></span>Ancalagon (1 139 recoils)</span></div></div>
+      <div class="chart" id="c-mslt"></div>
+      <figcaption><b>GEANT3 is flat across ±16 mrad; Ancalagon slopes by 0.79 mm/mrad and reaches the jaws.</b> Mean horizontal position where each code's own recoils cross the MSLT plane, in 4 mrad bins of the horizontal angle just after the target. The dashed lines are the jaws at ±0.75 cm. Ancalagon's outer bins are biased inward, because recoils that hit the jaws never cross the plane.</figcaption>
+    </figure>
+    <div class="tablewrap"><table id="t-fit"><thead><tr><th>From each code's own recoils</th><th class="n"><span class="key g3"></span>GEANT3</th><th class="n"><span class="key g4"></span>Ancalagon</th></tr></thead><tbody></tbody></table></div>
+    <ul class="col">
+      <li><b>A clean single-ray fan agrees.</b> 19Ne<sup>4+</sup> rays fired from past the target gas give (x|θ) ≈ +0.8 mm/mrad at MSLT, with the on-axis ray 1.9 mm off centre. They are exactly linear at Q1, so the error builds up downstream.</li>
+      <li><b>Fans must start past the target gas.</b> Fired from the target centre, each single ray picks up a random 2–3 mrad multiple-scattering kick in its first step. An earlier 19Ne fan that looked discontinuous was showing exactly that.</li>
+      <li><b>The tunes differ by 1 %.</b> GEANT3 scales the magnets by 0.9736 and Ancalagon by 0.9641 (RTUN), against 0.07 % for 39K(p,γ)40Ca. A tune offset shifts positions but does not create an angle term, so it does not explain the slope.</li>
+      <li><b>GEANT3's built-in 15O(α,γ)19Ne cannot be used.</b> Its 0.275 and 0.238 MeV states decay to an undefined particle (95). This comparison uses a file-driven copy, <code>o15ag.dat</code>, with the same levels, lifetimes and branching ratios as Ancalagon.</li>
+    </ul>
+  </section>
+
+  <section class="part">
+    <div class="eyebrow">Reaction 2 · 40Ca<sup>8+</sup>, E<sub>r</sub>(cm) = 606 keV, single 8.934 MeV γ, 5 Torr H<sub>2</sub></div>
+    <h2>39K(p,γ)40Ca</h2>
+  </section>
+
+  <section>
+    <div class="verdict">
+      <div class="v"><span class="chip good"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Agrees</span><h3>Transmission</h3><p>99.39 % in GEANT3 against 99.97 % in Ancalagon. The 0.6-point gap is statistically resolved but immaterial for DRAGON transmission.</p></div>
       <div class="v"><span class="chip good"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Agrees</span><h3>BGO array</h3><p>Hit fraction, spectrum shape and crystal multiplicity match. Ancalagon runs about 1 point high on every efficiency, which is 1–2.5σ.</p></div>
       <div class="v"><span class="chip bad"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Disagrees</span><h3>Final focus at FSLT</h3><p>GEANT3 focuses at FSLT to 0.12 cm rms. Ancalagon is 1.07 cm rms there, driven by an uncorrected (x|θ) = −2.5 mm/mrad.</p></div>
     </div>
@@ -141,7 +183,7 @@ pre{margin:0;overflow-x:auto;background:var(--surface);border:1px solid var(--ru
       <figure>
         <div class="fighead"><h3>Single-ray angle fan (Ancalagon)</h3></div>
         <div class="chart" id="c-fan"></div>
-        <figcaption>x at FSLT for single recoils fired from the target centre at a set horizontal angle. A true focus would be a flat line. <span class="key g4"></span>40Ca<sup>8+</sup> at 1320 MeV/c (solid), 19Ne<sup>4+</sup> at 258 MeV/c for o15ag_19ne (dashed).</figcaption>
+        <figcaption>x at FSLT for single recoils fired from the target centre at a set horizontal angle. A true focus would be a flat line. <span class="key g4"></span>40Ca<sup>8+</sup> at 1320 MeV/c.</figcaption>
       </figure>
     </div>
     <div class="stack col">
@@ -149,9 +191,9 @@ pre{margin:0;overflow-x:auto;background:var(--surface);border:1px solid var(--ru
       <ul>
         <li><b>The width is an angle term.</b> A fit of x at FSLT to the initial recoil angle and momentum over 3 000 real recoils gives (x|θ) = −2.53 mm/mrad. It leaves 0.11 cm rms unexplained. Dispersion (about 0.9 cm per 1 % in dp/p) contributes little.</li>
         <li><b>Single rays agree with the population.</b> The 40Ca<sup>8+</sup> fan is linear at −2.56 mm/mrad, and its on-axis ray lands 3.4 mm off centre.</li>
-        <li><b>It is not specific to this reaction.</b> 19Ne<sup>4+</sup> rays for o15ag_19ne show about −2.5 mm/mrad too, plus a 1.5 cm jump between −1 and 0 mrad. That jump looks like a boundary between overlapping quad field volumes.</li>
+        <li><b>It is not specific to this reaction.</b> 19Ne<sup>4+</sup> recoils in 15O(α,γ)19Ne show the same kind of residual angle term, at both MSLT and FSLT (see above).</li>
         <li><b>This contradicts the 2026-09-20 validation</b>, which recorded −0.21 mm/mrad at FSLT after the quad-container fix. That figure does not reproduce with real-species rays fired from the target.</li>
-        <li><b>Consequence:</b> transmission is unaffected only because FSLT and the DSSSD are wide. Ancalagon's DSSSD position and angle distributions should not be used until this is fixed. It may also contribute to the 58 % o15ag_19ne transmission; that has not been checked.</li>
+        <li><b>Consequence:</b> transmission is unaffected only because FSLT and the DSSSD are wide. Ancalagon's DSSSD position and angle distributions should not be used until this is fixed. For 15O(α,γ)19Ne, with its wider cone, the same problem at MSLT does cost transmission (see above).</li>
       </ul>
     </div>
   </section>
@@ -185,6 +227,7 @@ python3 analyze.py             # results/summary.txt, compare.png, chart_data.js
 
 <script>
 const DATA = {"rows": [{"label": "Recoil reaches DSSSD", "g3": [99.39024390243902, 0.07982042454323639], "g4": [99.97, 0.017317909804591518]}, {"label": "BGO: any crystal hit", "g3": [71.11017661900758, 0.46473181119960444], "g4": [71.88, 0.4495848751904361]}, {"label": "BGO: highest crystal > 2 MeV", "g3": [61.122792262405376, 0.4998195103468845], "g4": [62.1, 0.4851381246614206]}, {"label": "BGO: highest crystal > 5 MeV", "g3": [51.850294365012616, 0.5123143380254626], "g4": [53.080000000000005, 0.49905045837069417]}, {"label": "BGO: full-energy sum > 8.63 MeV", "g3": [30.267031118587045, 0.47105115030008315], "g4": [31.900000000000002, 0.466089047286031]}, {"label": "DSSSD and highest BGO > 2 MeV", "g3": [60.97560975609756, 0.5001614531677208], "g4": [62.09, 0.48516305506499563]}], "optics": [{"label": "x at FSLT, rms (cm)", "g3": 0.1245, "g4": 1.0691}, {"label": "x at FSLT, mean (cm)", "g3": -0.2885, "g4": 0.2669}, {"label": "x at DSSSD, rms (cm)", "g3": 0.3179, "g4": 0.8897}, {"label": "x at DSSSD, mean (cm)", "g3": -0.3653, "g4": -0.4792}, {"label": "x' at DSSSD, mean (mrad)", "g3": -1.1585, "g4": -11.2534}, {"label": "x' at DSSSD, rms (mrad)", "g3": 4.5044, "g4": 2.9585}, {"label": "y at DSSSD, rms (cm)", "g3": 0.1972, "g4": 0.0697}, {"label": "y' at DSSSD, rms (mrad)", "g3": 3.7373, "g4": 3.4971}, {"label": "x waist position z (cm)", "g3": -7.2379, "g4": -72.37}], "waist": {"dist": [-116.08, -115.07, -114.07, -113.07, -112.07, -111.07, -110.06, -109.06, -108.06, -107.06, -106.05, -105.05, -104.05, -103.05, -102.05, -101.04, -100.04, -99.04, -98.04, -97.04, -96.03, -95.03, -94.03, -93.03, -92.03, -91.02, -90.02, -89.02, -88.02, -87.02, -86.01, -85.01, -84.01, -83.01, -82.01, -81.0, -80.0, -79.0, -78.0, -77.0, -75.99, -74.99, -73.99, -72.99, -71.99, -70.98, -69.98, -68.98, -67.98, -66.98, -65.97, -64.97, -63.97, -62.97, -61.97, -60.96, -59.96, -58.96, -57.96, -56.96, -55.95, -54.95, -53.95, -52.95, -51.95, -50.94, -49.94, -48.94, -47.94, -46.94, -45.93, -44.93, -43.93, -42.93, -41.92, -40.92, -39.92, -38.92, -37.92, -36.91, -35.91, -34.91, -33.91, -32.91, -31.9, -30.9, -29.9, -28.9, -27.9, -26.89, -25.89, -24.89, -23.89, -22.89, -21.88, -20.88, -19.88, -18.88, -17.88, -16.87, -15.87, -14.87, -13.87, -12.87, -11.86, -10.86, -9.86, -8.86, -7.86, -6.85, -5.85, -4.85, -3.85, -2.85, -1.84, -0.84, 0.16, 1.16, 2.16, 3.17, 4.17, 5.17, 6.17, 7.17, 8.18, 9.18, 10.18, 11.18, 12.18, 13.19, 14.19, 15.19, 16.19, 17.2, 18.2, 19.2, 20.2, 21.2, 22.21, 23.21, 24.21, 25.21, 26.21, 27.22, 28.22, 29.22, 30.22, 31.22, 32.23, 33.23, 34.23, 35.23, 36.23, 37.24, 38.24, 39.24, 40.24, 41.24, 42.25, 43.25, 44.25, 45.25, 46.25, 47.26, 48.26, 49.26, 50.26, 51.26, 52.27, 53.27, 54.27, 55.27, 56.27, 57.28, 58.28, 59.28, 60.28, 61.28, 62.29, 63.29, 64.29, 65.29, 66.29], "g3": [0.5433, 0.539, 0.5346, 0.5302, 0.5258, 0.5214, 0.517, 0.5126, 0.5083, 0.5039, 0.4995, 0.4951, 0.4908, 0.4864, 0.4821, 0.4777, 0.4733, 0.469, 0.4646, 0.4603, 0.4559, 0.4516, 0.4473, 0.4429, 0.4386, 0.4343, 0.43, 0.4256, 0.4213, 0.417, 0.4127, 0.4084, 0.4041, 0.3998, 0.3955, 0.3912, 0.387, 0.3827, 0.3784, 0.3742, 0.3699, 0.3657, 0.3614, 0.3572, 0.353, 0.3487, 0.3445, 0.3403, 0.3361, 0.3319, 0.3278, 0.3236, 0.3194, 0.3153, 0.3111, 0.307, 0.3029, 0.2988, 0.2947, 0.2906, 0.2865, 0.2825, 0.2784, 0.2744, 0.2704, 0.2664, 0.2624, 0.2584, 0.2545, 0.2505, 0.2466, 0.2427, 0.2389, 0.235, 0.2312, 0.2274, 0.2237, 0.2199, 0.2162, 0.2125, 0.2089, 0.2053, 0.2017, 0.1982, 0.1947, 0.1912, 0.1878, 0.1845, 0.1812, 0.1779, 0.1747, 0.1716, 0.1685, 0.1655, 0.1625, 0.1597, 0.1569, 0.1542, 0.1516, 0.149, 0.1466, 0.1442, 0.142, 0.1399, 0.1379, 0.136, 0.1342, 0.1326, 0.1311, 0.1298, 0.1285, 0.1275, 0.1266, 0.1258, 0.1252, 0.1248, 0.1245, 0.1244, 0.1244, 0.1247, 0.125, 0.1256, 0.1263, 0.1271, 0.1281, 0.1293, 0.1306, 0.132, 0.1336, 0.1353, 0.1372, 0.1391, 0.1412, 0.1434, 0.1457, 0.1481, 0.1506, 0.1532, 0.1559, 0.1586, 0.1615, 0.1644, 0.1674, 0.1704, 0.1736, 0.1767, 0.18, 0.1833, 0.1866, 0.19, 0.1934, 0.1969, 0.2004, 0.204, 0.2076, 0.2112, 0.2149, 0.2186, 0.2223, 0.226, 0.2298, 0.2336, 0.2375, 0.2413, 0.2452, 0.2491, 0.253, 0.257, 0.2609, 0.2649, 0.2689, 0.2729, 0.2769, 0.281, 0.285, 0.2891, 0.2932, 0.2973, 0.3014, 0.3055, 0.3096, 0.3137, 0.3179], "g4": [1.3941, 1.3913, 1.3884, 1.3856, 1.3828, 1.3799, 1.3771, 1.3742, 1.3714, 1.3686, 1.3657, 1.3629, 1.36, 1.3572, 1.3544, 1.3515, 1.3487, 1.3459, 1.343, 1.3402, 1.3374, 1.3345, 1.3317, 1.3289, 1.326, 1.3232, 1.3204, 1.3175, 1.3147, 1.3119, 1.3091, 1.3062, 1.3034, 1.3006, 1.2978, 1.2949, 1.2921, 1.2893, 1.2865, 1.2836, 1.2808, 1.278, 1.2752, 1.2724, 1.2695, 1.2667, 1.2639, 1.2611, 1.2583, 1.2555, 1.2526, 1.2498, 1.247, 1.2442, 1.2414, 1.2386, 1.2358, 1.233, 1.2301, 1.2273, 1.2245, 1.2217, 1.2189, 1.2161, 1.2133, 1.2105, 1.2077, 1.2049, 1.2021, 1.1993, 1.1965, 1.1937, 1.1909, 1.1881, 1.1853, 1.1825, 1.1797, 1.1769, 1.1741, 1.1713, 1.1685, 1.1657, 1.163, 1.1602, 1.1574, 1.1546, 1.1518, 1.149, 1.1462, 1.1435, 1.1407, 1.1379, 1.1351, 1.1323, 1.1295, 1.1268, 1.124, 1.1212, 1.1184, 1.1157, 1.1129, 1.1101, 1.1073, 1.1046, 1.1018, 1.099, 1.0963, 1.0935, 1.0907, 1.088, 1.0852, 1.0825, 1.0797, 1.0769, 1.0742, 1.0714, 1.0687, 1.0659, 1.0631, 1.0604, 1.0576, 1.0549, 1.0521, 1.0494, 1.0466, 1.0439, 1.0412, 1.0384, 1.0357, 1.0329, 1.0302, 1.0274, 1.0247, 1.022, 1.0192, 1.0165, 1.0138, 1.011, 1.0083, 1.0056, 1.0029, 1.0001, 0.9974, 0.9947, 0.992, 0.9892, 0.9865, 0.9838, 0.9811, 0.9784, 0.9757, 0.9729, 0.9702, 0.9675, 0.9648, 0.9621, 0.9594, 0.9567, 0.954, 0.9513, 0.9486, 0.9459, 0.9432, 0.9405, 0.9378, 0.9351, 0.9324, 0.9298, 0.9271, 0.9244, 0.9217, 0.919, 0.9164, 0.9137, 0.911, 0.9083, 0.9057, 0.903, 0.9003, 0.8977, 0.895, 0.8923, 0.8897]}, "xfslt": {"edges": [-3.0, -2.9, -2.8, -2.7, -2.6, -2.5, -2.4, -2.3, -2.2, -2.1, -2.0, -1.9, -1.8, -1.7, -1.6, -1.5, -1.4, -1.3, -1.2, -1.1, -1.0, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0], "g3": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.00533, 0.03733, 0.128, 0.312, 0.28267, 0.16, 0.072, 0.00267, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "g4": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0001, 0.0, 0.0009, 0.0043, 0.0162, 0.02331, 0.02521, 0.02621, 0.02241, 0.02221, 0.02571, 0.02251, 0.02281, 0.02191, 0.02271, 0.02291, 0.02491, 0.02441, 0.02761, 0.02861, 0.02551, 0.02671, 0.02591, 0.02781, 0.02961, 0.02831, 0.02951, 0.02911, 0.02841, 0.03341, 0.02751, 0.02871, 0.02741, 0.02981, 0.03111, 0.02941, 0.02981, 0.02821, 0.03001, 0.02881, 0.02731, 0.0113, 0.0014, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, "fan": {"ca": [[-4, 1.2926506662350903], [-2, 0.8194055681749433], [-1, 0.5911074728271615], [0, 0.34404565672707577], [1, 0.06615833206637944], [2, -0.19307615782713583], [4, -0.7579605734604229]], "ne": [[-2, 1.4684845649678664], [-1, 1.2196537318048968], [0, -0.25882165063558205], [1, -0.5014538669981903], [2, -0.7693154466101078]], "slope_mm_per_mrad": -2.56, "fit_slope_mm_per_mrad": -2.533, "fit_resid_cm": 0.106}, "bgo": {"edges": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5.0, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 7.0, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 9.0, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 10.0], "g3": [0.0, 0.00606, 0.00917, 0.0102, 0.01138, 0.03814, 0.00769, 0.00754, 0.00532, 0.00532, 0.00488, 0.00547, 0.00325, 0.00325, 0.00473, 0.00429, 0.00251, 0.00399, 0.00399, 0.00325, 0.0034, 0.00458, 0.0031, 0.00237, 0.0031, 0.0031, 0.00414, 0.00473, 0.0037, 0.00399, 0.00414, 0.00488, 0.0037, 0.00384, 0.0034, 0.0034, 0.00488, 0.00281, 0.00695, 0.00325, 0.00458, 0.00444, 0.00399, 0.00444, 0.00547, 0.00606, 0.00532, 0.00739, 0.0071, 0.00414, 0.00591, 0.00857, 0.00577, 0.00651, 0.00724, 0.00517, 0.00517, 0.00636, 0.0068, 0.00931, 0.00784, 0.00843, 0.0071, 0.00828, 0.00931, 0.00739, 0.00798, 0.00961, 0.00902, 0.01227, 0.0105, 0.01035, 0.01257, 0.01375, 0.01552, 0.01464, 0.01508, 0.01538, 0.01582, 0.01804, 0.01804, 0.02898, 0.03548, 0.03652, 0.03341, 0.02765, 0.04332, 0.05027, 0.03947, 0.03785, 0.03578, 0.03474, 0.01198, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "g4": [0.0, 0.0089, 0.01002, 0.01155, 0.01029, 0.03784, 0.00682, 0.00765, 0.00556, 0.00459, 0.00487, 0.00348, 0.0025, 0.00237, 0.00362, 0.00362, 0.0032, 0.00376, 0.00306, 0.00237, 0.00334, 0.00334, 0.0039, 0.00543, 0.00223, 0.00264, 0.00334, 0.00417, 0.0039, 0.00292, 0.00445, 0.0032, 0.00306, 0.00237, 0.0039, 0.0039, 0.00459, 0.0039, 0.00556, 0.00334, 0.00543, 0.00556, 0.00556, 0.00417, 0.00417, 0.00515, 0.0064, 0.00556, 0.00487, 0.00515, 0.00543, 0.00501, 0.00403, 0.00598, 0.00737, 0.00654, 0.00793, 0.00626, 0.00737, 0.00529, 0.00904, 0.0064, 0.00668, 0.00751, 0.00723, 0.00904, 0.01169, 0.00974, 0.00904, 0.00793, 0.00946, 0.01196, 0.01196, 0.01113, 0.01322, 0.01349, 0.01447, 0.01558, 0.01725, 0.01669, 0.01669, 0.03116, 0.03937, 0.03715, 0.03812, 0.03478, 0.04466, 0.05064, 0.04535, 0.03478, 0.03728, 0.03603, 0.01169, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "g3_frac": 0.7111, "g4_frac": 0.7188}, "n": {"g3_all": 10000, "g3": 9512, "g3_global": 375, "g4": 10000, "fit": 2999}};
+const O15 = {"fates": [{"label": "DSSSD", "g3": [82.29452778364673, 0.39233403585865534], "g4": [51.2, 0.4998559792580259]}, {"label": "MSLT", "g3": [0.8556940629621805, 0.09466945952830344], "g4": [39.79, 0.48946459524668384]}, {"label": "FSLT", "g3": [0.1373336150433129, 0.03806332778251795], "g4": [4.569999999999999, 0.20883368981081574]}, {"label": "QSLT", "g3": [8.155503908725967, 0.28129934304202514], "g4": [1.01, 0.09998994949493674]}, {"label": "Target and pumping", "g3": [7.056834988379464, 0.26322701558755107], "g4": [2.78, 0.16439939172636864]}, {"label": "Other beamline", "g3": [1.500105641242341, 0.1249382890938456], "g4": [0.65, 0.08036012692872006]}], "n": {"g3_all": 10000, "g3": 9466, "g3_global": 653, "g4": 10000}, "fit": {"GEANT3": {"MSLT": {"n": 1262.0, "slope_mm_per_mrad": 0.0341, "offset_cm": -0.0308, "rms_cm": 0.0916}, "FSLT": {"n": 1253.0, "slope_mm_per_mrad": 0.0432, "offset_cm": 0.2256, "rms_cm": 0.2533}}, "Ancalagon": {"MSLT": {"n": 1139.0, "slope_mm_per_mrad": 0.7887, "offset_cm": -0.1775, "rms_cm": 0.4328}, "FSLT": {"n": 1020.0, "slope_mm_per_mrad": 1.906, "offset_cm": -0.3018, "rms_cm": 1.3205}}}, "mslt": {"g3": [[-14, -0.09727432432432433], [-10, -0.0613748076923077], [-6, -0.05005552631578947], [-2, -0.04176016129032258], [2, -0.014574450867052025], [6, -0.016961446540880505], [10, -0.011396204379562043], [14, -0.015963414634146342]], "g4": [[-10, -0.7225258823529411], [-6, -0.6037499507389162], [-2, -0.36173612903225805], [2, -0.044582038461538465], [6, 0.31546518987341776], [10, 0.5069608730158729], [14, 0.6551682352941176]]}, "fslt": {"g3": [[-14, 0.14340414414414415], [-10, 0.1879101282051282], [-6, 0.20370726315789475], [-2, 0.20393248648648646], [2, 0.26020248554913294], [6, 0.2333354430379747], [10, 0.29580014814814815], [14, 0.407585625]], "g4": [[-10, -1.9807717647058822], [-6, -1.4011140268456375], [-2, -0.6801249999999999], [2, 0.03750744186046511], [6, 0.8559671739130434], [10, 1.2836951239669425], [14, 1.5995294117647059]]}, "fan": [[-16, -1.2632], [-12, -1.0109], [-8, -0.7441], [-4, -0.4754], [-2, -0.3302], [-1, -0.2582], [0, -0.1868], [1, -0.1103], [2, -0.0316], [4, 0.1288], [8, 0.5102], [12, 0.9533], [16, 1.5399]]};
 const $ = (s) => document.querySelector(s);
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const fmt = (v, d) => (v >= 0 ? "" : "−") + Math.abs(v).toFixed(d);
@@ -223,6 +266,17 @@ const fmt = (v, d) => (v >= 0 ? "" : "−") + Math.abs(v).toFixed(d);
   }
 })();
 
+(function () {
+  const put = (tb, cells) => { const tr = document.createElement("tr"); cells.forEach((t, i) => { const td = document.createElement("td"); td.textContent = t; if (i) td.className = "n"; tr.appendChild(td); }); tb.appendChild(tr); };
+  const tf = $("#t-fate tbody");
+  for (const r of O15.fates) put(tf, [r.label, r.g3[0].toFixed(1) + " ± " + r.g3[1].toFixed(1) + " %", r.g4[0].toFixed(1) + " ± " + r.g4[1].toFixed(1) + " %"]);
+  const tt = $("#t-fit tbody"), F = O15.fit;
+  for (const k of ["MSLT", "FSLT"]) {
+    put(tt, [k + ": (x|θ) slope", fmt(F.GEANT3[k].slope_mm_per_mrad, 2) + " mm/mrad", fmt(F.Ancalagon[k].slope_mm_per_mrad, 2) + " mm/mrad"]);
+    put(tt, [k + ": x rms", F.GEANT3[k].rms_cm.toFixed(2) + " cm", F.Ancalagon[k].rms_cm.toFixed(2) + " cm"]);
+  }
+})();
+
 // minimal chart kit: line/step series, one y-scale, crosshair tooltip
 function chart(el, o) {
   const W = o.w || 900, Hh = o.h || 320, m = { l: 56, r: 16, t: 14, b: 44 };
@@ -247,6 +301,10 @@ function chart(el, o) {
   }
   const xl = mk("text", { x: m.l + pw / 2, y: Hh - 4, "text-anchor": "middle", class: "lab" }); xl.textContent = o.xlabel;
   const yl = mk("text", { x: 14, y: m.t + ph / 2, "text-anchor": "middle", class: "lab", transform: `rotate(-90 14 ${m.t + ph / 2})` }); yl.textContent = o.ylabel;
+  for (const h of o.hlines || []) {
+    mk("line", { x1: m.l, x2: m.l + pw, y1: Y(h.y), y2: Y(h.y), class: "marker" });
+    const t = mk("text", { x: m.l + pw - 4, y: Y(h.y) - 5, "text-anchor": "end", class: "lab" }); t.textContent = h.label;
+  }
   for (const mkr of o.markers || []) {
     mk("line", { x1: X(mkr.x), x2: X(mkr.x), y1: m.t, y2: m.t + ph, class: "marker" });
     const t = mk("text", { x: X(mkr.x) + 5, y: m.t + 12, class: "lab" }); t.textContent = mkr.label;
@@ -286,7 +344,18 @@ const nearest = (arr, v) => { let b = 0; for (let i = 1; i < arr.length; i++) if
 const steps = (edges, vals) => { const p = []; vals.forEach((v, i) => { p.push([edges[i], v], [edges[i + 1], v]); }); return p; };
 
 function draw() {
-  for (const id of ["#c-waist", "#c-prof", "#c-fan", "#c-bgo"]) $(id).replaceChildren();
+  for (const id of ["#c-waist", "#c-prof", "#c-fan", "#c-bgo", "#c-mslt"]) $(id).replaceChildren();
+  const ms = O15.mslt, mb = [...new Set([...ms.g3.map((p) => p[0]), ...ms.g4.map((p) => p[0])])].sort((a, b) => a - b);
+  chart($("#c-mslt"), {
+    h: 320, aria: "Mean x at MSLT against recoil angle for GEANT3 and Ancalagon",
+    x: [-17, 17], y: [-1, 1], xt: [-16, -12, -8, -4, 0, 4, 8, 12, 16], yt: [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1], yf: (t) => t.toFixed(2),
+    xlabel: "horizontal recoil angle after the target (mrad)", ylabel: "mean x at MSLT (cm)",
+    hlines: [{ y: 0.75, label: "jaw +0.75" }, { y: -0.75, label: "jaw −0.75" }],
+    series: [{ color: "--g3", pts: ms.g3, dots: true }, { color: "--g4", pts: ms.g4, dots: true }],
+    snap: (v) => { const a = mb[nearest(mb, v)]; const g = ms.g3.find((p) => p[0] === a), h = ms.g4.find((p) => p[0] === a);
+      const rows = []; if (g) rows.push({ name: "GEANT3", color: "--g3", val: fmt(g[1], 3) + " cm" }); if (h) rows.push({ name: "Ancalagon", color: "--g4", val: fmt(h[1], 3) + " cm" });
+      return { x: a, head: (a - 2) + " to " + (a + 2) + " mrad", rows }; },
+  });
   const w = DATA.waist;
   chart($("#c-waist"), {
     aria: "Horizontal beam rms against distance downstream of FSLT for GEANT3 and Ancalagon",
@@ -307,14 +376,14 @@ function draw() {
     snap: (v) => { const i = nearest(ctr, v); return { x: ctr[i], head: "x = " + pr.edges[i].toFixed(1) + " to " + pr.edges[i + 1].toFixed(1) + " cm",
       rows: [{ name: "GEANT3", color: "--g3", val: (100 * pr.g3[i]).toFixed(1) + " %" }, { name: "Ancalagon", color: "--g4", val: (100 * pr.g4[i]).toFixed(1) + " %" }] }; },
   });
-  const f = DATA.fan, angs = [...new Set([...f.ca.map((p) => p[0]), ...f.ne.map((p) => p[0])])].sort((a, b) => a - b);
+  const f = DATA.fan, angs = f.ca.map((p) => p[0]);
   chart($("#c-fan"), {
     w: 460, h: 300, aria: "Ancalagon x at FSLT against initial angle for 40Ca8+ and 19Ne4+ single rays",
     x: [-4.5, 4.5], y: [-1, 1.6], xt: [-4, -2, 0, 2, 4], yt: [-1, -0.5, 0, 0.5, 1, 1.5], yf: (t) => t.toFixed(1),
     xlabel: "initial horizontal angle (mrad)", ylabel: "x at FSLT (cm)",
-    series: [{ color: "--g4", pts: f.ca, dots: true }, { color: "--g4", pts: f.ne, dots: true, hollow: true, dash: "5 4", w: 1.5 }],
+    series: [{ color: "--g4", pts: f.ca, dots: true }],
     snap: (v) => { const a = angs[nearest(angs, v)]; const c = f.ca.find((p) => p[0] === a), n = f.ne.find((p) => p[0] === a);
-      const rows = []; if (c) rows.push({ name: "40Ca⁸⁺", color: "--g4", val: fmt(c[1], 3) + " cm" }); if (n) rows.push({ name: "19Ne⁴⁺", color: "--g4", val: fmt(n[1], 3) + " cm" });
+      const rows = []; if (c) rows.push({ name: "40Ca⁸⁺", color: "--g4", val: fmt(c[1], 3) + " cm" });
       return { x: a, head: (a > 0 ? "+" : a < 0 ? "−" : "") + Math.abs(a) + " mrad", rows }; },
   });
   const b = DATA.bgo, bc = b.edges.slice(0, -1).map((e, i) => (e + b.edges[i + 1]) / 2);

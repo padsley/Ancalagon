@@ -31,7 +31,11 @@ ROOT files in `data/` stay local; everything else here is small text.
 
 Transmission and the BGO array agree. The final horizontal focus does not:
 Ancalagon has (x|θ) = −2.5 mm/mrad at FSLT, confirmed by a fit to 3k real
-recoils (residual 0.11 cm) and by single-ray fans of 40Ca8+ and 19Ne4+.
+recoils (residual 0.11 cm) and by a single-ray 40Ca8+ fan. The 19Ne4+ fan
+in `data/fan/ne.*.txt` was fired from the target centre, so each ray took a
+random 2-3 mrad multiple-scattering kick in the gas; its apparent jump
+between -1 and 0 mrad is that, not a field bug. See `../g3_crosscheck_o15ag`
+for a scatter-free 19Ne fan and the full 15O(a,g)19Ne comparison.
 
 ## Conventions and gotchas
 

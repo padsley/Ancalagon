@@ -1,0 +1,19 @@
+GEANT3: 10000 generated, 9466 reacting; 1676 recoil stop points; global-frame sample 653 recoils at the DSSSD.
+Ancalagon: 10000 events.
+
+== Where recoils end up (% of reacting events) ==
+  DSSSD                GEANT3  82.29 +- 0.39   Ancalagon  51.20 +- 0.50
+  MSLT                 GEANT3   0.86 +- 0.09   Ancalagon  39.79 +- 0.49
+  FSLT                 GEANT3   0.14 +- 0.04   Ancalagon   4.57 +- 0.21
+  QSLT                 GEANT3   8.16 +- 0.28   Ancalagon   1.01 +- 0.10
+  Target and pumping   GEANT3   7.06 +- 0.26   Ancalagon   2.78 +- 0.16
+  Other beamline       GEANT3   1.50 +- 0.12   Ancalagon   0.65 +- 0.08
+  (GEANT3 stops unassigned/far from any element: 569; GEANT3 stops total 1676 vs reacting-but-lost 1676)
+  Ancalagon slit jaws: FSLT_X+ 15, FSLT_X- 439, FSLT_Y+ 1, FSLT_Y- 2, MSLT_X+ 1439, MSLT_X- 2540, QSLT_X+ 37, QSLT_X- 57, QSLT_Y+ 4, QSLT_Y- 3
+
+== Final-focus optics, transmitted recoils (global frame) ==
+  x at FSLT, rms (cm)          GEANT3    0.206   Ancalagon    1.309
+  x at FSLT, mean (cm)         GEANT3   -0.222   Ancalagon   -0.039
+  x at DSSSD, rms (cm)         GEANT3    0.691   Ancalagon    1.075
+  x' at DSSSD, mean (mrad)     GEANT3   -1.786   Ancalagon   -4.826
+  x waist position z (cm)      GEANT3   -5.234   Ancalagon  -72.370
