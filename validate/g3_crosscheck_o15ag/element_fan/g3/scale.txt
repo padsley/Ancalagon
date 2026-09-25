@@ -1,0 +1,2 @@
+ Magnetic element scale factor   0.973574579    
+ Electric element scale factor   0.947756231    

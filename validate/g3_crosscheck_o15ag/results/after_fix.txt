@@ -1,0 +1,19 @@
+Ancalagon after the quad field-origin and field-superposition fixes (2026-09-25),
+real 2014 tune (MSLT 0.75 x 1.25 cm), 10k --track-reaction events, RANDOM_SEED=12345.
+Recoil's final volume (count):
+== o15ag_19ne
+   9624 DSSSD
+    116 EX5C
+     76 EX3C
+     46 QSLT_X+
+     30 MSLT_X+
+     26 PDE1
+     21 PDI3
+     18 PDH3
+== k39pg_40ca
+   9999 DSSSD
+      1 EX3C
+
+FSLT x of transmitted recoils (4k events, RANDOM_SEED=777), Q14 steering default 0.21 vs 0:
+  o15ag_19ne: steer 0.21 mean +0.267 rms 0.275 cm | steer 0 mean +0.616 rms 0.274 cm | GEANT3 mean -0.222 rms 0.206 cm
+  k39pg_40ca: steer 0.21 mean -0.337 rms 0.106 cm | steer 0 mean +0.579 rms 0.103 cm | GEANT3 mean -0.288 rms 0.125 cm

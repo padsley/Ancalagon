@@ -3,7 +3,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
 
+#include "G4AffineTransform.hh"
 #include "G4Box.hh"
 #include "G4ChordFinder.hh"
 #include "G4Colour.hh"
@@ -13,6 +15,7 @@
 #include "G4IntegrationDriver.hh"
 #include "G4LogicalVolume.hh"
 #include "G4LogicalVolumeStore.hh"
+#include "G4MagneticField.hh"
 #include "G4MagIntegratorStepper.hh"
 #include "G4Mag_UsualEqRhs.hh"
 #include "G4Material.hh"
@@ -25,6 +28,7 @@
 #include "G4ThreeVector.hh"
 #include "G4Tubs.hh"
 #include "G4UserLimits.hh"
+#include "G4VSolid.hh"
 #include "G4VisAttributes.hh"
 #include "BgoArray.hh"
 #include "DsssdSD.hh"
@@ -416,11 +420,57 @@ void BuildEdipole(G4LogicalVolume* worldLV, G4Material* vacuum, const char* name
 // entry point, which is a documented placement simplification, not a
 // physics one (the field itself is still bit-exact validated against the
 // real Fortran).
+// Superposed magnetic field of every chain element whose container holds
+// the point -- GEANT3's own rule: gufld.f's "Add all overlapping fields"
+// loop sums the field of every other MANY WRLD daughter that contains the
+// point, so neighbouring quads' fringe fields add where their containers
+// overlap (Q1/Q2, Q3-Q7, Q8-Q10, ...). Geant4 gives a point to one volume
+// only, so without this each overlap region silently dropped one element's
+// fringe -- found by the 15O(a,g)19Ne GEANT3 cross-check
+// (validate/g3_crosscheck_o15ag/element_fan). Every chain magnetic
+// container gets this same field; containment uses each element's own
+// solid and placement. FIELD_SUPERPOSITION=0 (diagnostic) restores the
+// old one-volume-one-field behaviour.
+class ChainMagneticFieldSum : public G4MagneticField {
+ public:
+  void Add(G4MagneticField* field, const G4VSolid* solid, const G4VPhysicalVolume* pv) {
+    fEntries.push_back(
+        {field, solid, G4AffineTransform(pv->GetRotation(), pv->GetTranslation()).Inverse()});
+  }
+  void GetFieldValue(const G4double point[4], G4double* bField) const override {
+    bField[0] = bField[1] = bField[2] = 0.0;
+    const G4ThreeVector p(point[0], point[1], point[2]);
+    for (const auto& e : fEntries) {
+      if (e.solid->Inside(e.worldToLocal.TransformPoint(p)) == kOutside) continue;
+      G4double b[3] = {0.0, 0.0, 0.0};
+      e.field->GetFieldValue(point, b);
+      bField[0] += b[0];
+      bField[1] += b[1];
+      bField[2] += b[2];
+    }
+  }
+
+ private:
+  struct Entry {
+    G4MagneticField* field;
+    const G4VSolid* solid;
+    G4AffineTransform worldToLocal;
+  };
+  std::vector<Entry> fEntries;
+};
+
+bool FieldSuperpositionEnabled() {
+  const char* v = std::getenv("FIELD_SUPERPOSITION");
+  return !(v && std::atoi(v) == 0);
+}
+
 struct ChainState {
   double xCm = 0.0;
   double zCm = 0.0;
   double thetaDeg = 0.0;
+  ChainMagneticFieldSum* magSum = nullptr;  // null: each container keeps its own field
 };
+
 
 void Drift(ChainState& s, double lengthCm) {
   const double th = s.thetaDeg * CLHEP::pi / 180.0;
@@ -480,6 +530,18 @@ void AttachElectric(G4LogicalVolume* lv, G4ElectricField* field) {
   lv->SetFieldManager(fieldManager, true);
 }
 
+// Attaches a chain element's magnetic field: through the shared sum when
+// superposition is on, directly otherwise.
+void AttachChainMagnetic(ChainState& s, G4LogicalVolume* lv, G4MagneticField* field,
+                         const G4VPhysicalVolume* pv) {
+  if (s.magSum) {
+    s.magSum->Add(field, lv->GetSolid(), pv);
+    AttachMagnetic(lv, s.magSum);
+  } else {
+    AttachMagnetic(lv, field);
+  }
+}
+
 // Places a quadrupole at the chain's current entry point and advances the
 // chain by its pass-through length A+B+L; theta is unchanged (a
 // quadrupole doesn't bend the design trajectory). The geometry is always
@@ -518,9 +580,10 @@ void AttachElectric(G4LogicalVolume* lv, G4ElectricField* field) {
 // but for the QUADS it was routinely far more aggressive: e.g. Q2's
 // natural half-length is 40.5cm, but the non-overlap cap against Q1 was
 // only 27.5cm -- truncating over 30% of Q2's own real fringe field.
-// GEANT3's own architecture never hits this tradeoff at all: mitray_field.f
-// dispatches every element from one shared device table, not a Geant4-style
-// wall of separate solids, so adjacent elements' fringes simply coexist.
+// GEANT3 doesn't have this tradeoff: gufld.f adds the fields of every
+// overlapping MANY volume, so adjacent elements' fringes superpose. The
+// chain now does the same (ChainMagneticFieldSum), so an overlap no
+// longer drops either element's field.
 // A cross-check confirmed this truncation, not a field-formula bug, is
 // what was driving Ancalagon's own QSLT/MSLT/FSLT achromatic-focus
 // residuals far above GEANT3's own (all quad FIELD VALUES were already
@@ -541,6 +604,12 @@ void AttachElectric(G4LogicalVolume* lv, G4ElectricField* field) {
 // k39pg_40ca's own GEANT3 comparison run reaches 99.3% at this same real
 // tune, so Ancalagon is now much closer to that, not further from it.
 // The dipoles/e-dipoles are untouched (already correctly sized).
+//
+// 2026-09-25: the slope and transmission figures above predate two
+// further fixes found by the 15O(a,g)19Ne GEANT3 cross-check -- the quad
+// field origin (see below) and field superposition in overlaps -- and
+// were measured with single-ray fans fired through the target gas, which
+// multiple scattering corrupts. See validate/g3_crosscheck_o15ag.
 void ChainQuad(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, const char* name,
                const MitrayPoleData& data, double maxExtentCm, double steerCm = 0.0) {
   DumpChainState(name, s);
@@ -549,14 +618,25 @@ void ChainQuad(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, cons
   const double centerXCm = s.xCm + entryToCentreCm * std::sin(th);
   const double centerZCm = s.zCm + entryToCentreCm * std::cos(th);
 
-  // steerCm shifts the FIELD's own centre only (not the container/
+  // Field origin (local za = 0) is the chain's entry point, NOT the
+  // container centre: FieldInLocalCm measures za from the element's
+  // initial reference plane (entrance EFB at za = A, via zb = A - za),
+  // exactly as GEANT3 does -- ugeom_mitray.f offsets each POLE's local z
+  // by dz = (Z11 - Z22 - L)/2 "to position the A-frame at the edge of the
+  // entrance EFB" before calling the field routine. Using the container
+  // centre here shifted every quad's field downstream by entryToCentreCm
+  // (12.6 cm for Q1, 16.7 cm for Q2), which left MSLT and FSLT without
+  // their angle-independent focus (found by the 15O(a,g)19Ne GEANT3
+  // cross-check, validate/g3_crosscheck_o15ag/element_fan).
+  //
+  // steerCm shifts the FIELD's own origin only (not the container/
   // geometry below, which stays at the real hardware position) by a
   // local-frame transverse (dispersive-plane) offset -- see
   // QuadSteerOffsetCm's own comment for why this is the right lever for
   // a steering correction, as opposed to a field-strength trim.
-  const double fieldCenterXCm = centerXCm + steerCm * std::cos(th);
-  const double fieldCenterZCm = centerZCm - steerCm * std::sin(th);
-  auto* field = new MitrayQuadrupoleField(data, G4ThreeVector(fieldCenterXCm, 0.0, fieldCenterZCm),
+  const double fieldOriginXCm = s.xCm + steerCm * std::cos(th);
+  const double fieldOriginZCm = s.zCm - steerCm * std::sin(th);
+  auto* field = new MitrayQuadrupoleField(data, G4ThreeVector(fieldOriginXCm, 0.0, fieldOriginZCm),
                                            s.thetaDeg);
 
   const double halfLengthCm = std::min((data.L + data.Z11 + data.Z22) / 2.0, maxExtentCm);
@@ -564,9 +644,9 @@ void ChainQuad(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, cons
   auto* lv = new G4LogicalVolume(solid, vacuum, name);
   lv->SetVisAttributes(kQuadVis);
   G4RotationMatrix* rot = BeamAxisRotation(s.thetaDeg);
-  new G4PVPlacement(rot, G4ThreeVector(centerXCm * cm, 0.0, centerZCm * cm), lv, name, worldLV,
-                     false, 0, true);
-  AttachMagnetic(lv, field);
+  auto* pv = new G4PVPlacement(rot, G4ThreeVector(centerXCm * cm, 0.0, centerZCm * cm), lv, name,
+                                worldLV, false, 0, true);
+  AttachChainMagnetic(s, lv, field, pv);
 
   const double passThroughCm = data.A + data.B + data.L;
   s.xCm += passThroughCm * std::sin(th);
@@ -633,9 +713,9 @@ void ChainDipole(ChainState& s, G4LogicalVolume* worldLV, G4Material* vacuum, co
   auto* solid = new G4Box(name, halfWidthCm * cm, halfHeightCm * cm, containerRadiusCm * cm);
   auto* lv = new G4LogicalVolume(solid, vacuum, name);
   lv->SetVisAttributes(kDipoleVis);
-  new G4PVPlacement(rot, G4ThreeVector(midXCm * cm, 0.0, midZCm * cm), lv, name, worldLV, false,
-                     0, true);
-  AttachMagnetic(lv, field);
+  auto* pv = new G4PVPlacement(rot, G4ThreeVector(midXCm * cm, 0.0, midZCm * cm), lv, name,
+                                worldLV, false, 0, true);
+  AttachChainMagnetic(s, lv, field, pv);
 
   const double exitXLocalCm = -data.RB * (1.0 - std::cos(phiRad));
   const double exitZLocalCm = data.RB * std::sin(phiRad);
@@ -951,6 +1031,7 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     const double electricScale = ComputeElectricRetuneScale(reactionConfig, magneticScale);
 
     ChainState s;
+    if (FieldSuperpositionEnabled()) s.magSum = new ChainMagneticFieldSum();
     G4VisAttributes tstVis(G4Colour(0.0, 1.0, 1.0));  // cyan: MCP0/MCP1 markers
     tstVis.SetForceWireframe(true);
 

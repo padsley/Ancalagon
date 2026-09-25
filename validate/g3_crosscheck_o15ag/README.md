@@ -64,3 +64,15 @@ The scatter-free Ancalagon fan (`fan.py`) is linear at Q1 and shows
   slit-plane positions are interpolated along those straight segments.
 - Raw track captures (`data/*/planes.txt`, up to 143 MB) are gitignored;
   `plane_fit.py` reduces them to `plane_points.csv` on first read.
+
+## Resolution (same day)
+
+The MSLT/FSLT focus errors were two Ancalagon geometry bugs, localized with
+matched single-ray fans in both codes (`element_fan/`): every quad's field
+origin sat at its container centre instead of its entrance reference plane,
+and overlapping field containers did not superpose (GEANT3's `gufld.f` adds
+them). With both fixed, o15ag_19ne transmission is 96.2 % (was 51.2 %; MSLT
+loss 0.3 %), k39pg_40ca 99.99 %, and FSLT x rms 0.28 / 0.11 cm against
+GEANT3's 0.21 / 0.13 cm (`results/after_fix.txt`). The remaining gap to
+GEANT3's 82.3 % is its QSLT and target-region losses from beam emittance,
+which Ancalagon does not model. The tables above are the pre-fix results.
