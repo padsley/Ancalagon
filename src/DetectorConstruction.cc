@@ -1221,7 +1221,14 @@ G4VPhysicalVolume* DetectorConstruction::Construct() {
     Drift(s, 9.8);                                         // DF37, line 311
     Drift(s, 26.0);                                        // DF38, line 315
     Drift(s, 9.3);                                         // 'DF',  line 319
+    Shift(s, -0.33216);                                    // SH34, line 322
     ChainDipole(s, worldLV, vacuum, "D2", RetunedD2(MitrayDipoleData::D2(), magneticScale), 52.9418);  // line 324
+    // SH34/SH35 were missing until 2026-09-25: the in/out shifts act in
+    // frames 75 degrees apart, so they leave the downstream axis displaced
+    // by 3.32*(1-cos75) = 2.46 mm sideways and 3.32*sin75 = 3.21 mm along
+    // the beam -- exactly GEANT3's frame offset at Q11..Q14
+    // (validate/g3_crosscheck_o15ag/element_fan).
+    Shift(s, 0.33216);                                     // SH35, line 336
 
     Drift(s, 56.076);                                      // DF39, line 341
     Drift(s, 6.025);                                       // DF40, line 346

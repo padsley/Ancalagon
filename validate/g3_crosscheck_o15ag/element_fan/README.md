@@ -62,6 +62,60 @@ in `run_fans.sh`); the earlier columns were coarse-stepped, which is exact
 only where the World carried no field. (a|θ) also agrees to <1 % through
 RC40, 5–8 % after E2.
 
+## E1/E2 follow-up: one Ancalagon bug, one GEANT3 problem
+
+Diagnosed by temporarily instrumenting GEANT3 (a print of the local
+coordinates/field `guefld.f` hands `mitray_field`, and of VECT(7) in the
+FOCUSTEST line); both were reverted and the binary restored byte-identical.
+
+**Ancalagon: the SH34/SH35 shift pair around D2 was missing.** GEANT3's local
+frames agree with Ancalagon's to 0.001 mm at Q8-Q10 but are displaced by
+2.46 mm at Q11/Q12, 2.5 mm at E2 and 3.86 mm at Q13/Q14. The deck shifts by
+-0.33216 cm before D2 and +0.33216 cm after it; in frames 75 degrees apart
+these leave the downstream axis 3.32(1-cos75) = 2.46 mm sideways and
+3.32 sin75 = 3.21 mm along the beam, which accounts for every displacement.
+(Ancalagon already applied the SH08/09, SH23/24 and SH43/44 pairs.) With the
+pair added, the on-axis ray agrees with GEANT3 to 0.2-0.3 mm after D2, E2 and
+at FSLT (was 5.7 mm at RC55), and the population centroids match: 39K(p,g)40Ca
+FSLT x -0.277 vs GEANT3 -0.288 cm, DSSSD x -0.341 vs -0.365 cm, x' -0.98 vs
+-1.16 mrad. Transmission is unchanged (96.25 % / 99.99 %).
+
+**GEANT3: `gthion.f` discards electric-field momentum changes below 1 keV/c
+per step.** After each field step it applies `DELTAP = VOUT(7) - VECT(7)` only
+`IF(ABS(DELTAP) .GT. 1.E-6)` (GeV/c). With its 0.366 cm steps in E2:
+
+- In the uniform region the ion's kinetic energy is frozen (1791.061 keV
+  from 10 to 140 cm) while the ray drifts 0.7 mm radially (~1 keV change
+  due). A ray with a 2 mrad angle changes energy by ~0.01 keV per step,
+  0.7 keV/c of momentum: always dropped.
+- In the entrance fringe only steps between -7.9 and +6.0 cm are applied;
+  the tails are dropped. Position-offset rays still get most of their
+  fringe energy change (2-3 keV/c per step).
+- Net: E2 no longer conserves energy (on-axis ray exits 0.76 keV low;
+  Ancalagon returns to its entry energy within 0.005 keV), and its transport
+  is a hybrid -- position terms like exact electrostatic optics, angle terms
+  partway to constant-speed optics -- so it is not phase-space conserving.
+
+An idealized cylindrical deflector with E2's geometry (`deflector_model.py`,
+independent of both codes) reproduces this:
+
+| RC49 -> RC51 | (x\|x) | (x\|a) mm/mrad | (a\|x) mrad/cm | (a\|a) | det |
+|---|---|---|---|---|---|
+| model, energy follows potential | 0.541 | 1.667 | -4.15 | 0.567 | 0.999 |
+| Ancalagon | 0.544 | 1.665 | -4.24 | 0.537 | 0.998 |
+| model, energy frozen | 0.999 | 2.058 | -0.06 | 1.002 | 1.012 |
+| GEANT3 | 0.531 | 1.886 | -4.56 | 0.837 | 1.305 |
+
+E1 shows the same effect, smaller (det 1.075). The cut's impact depends on
+GEANT3's step length, set by its tracking-medium parameters. Separately,
+GEANT3's purely magnetic Q8-D2 section gives det 0.980 against Ancalagon's
+0.999 -- a smaller, unexplained deviation (GEANT3 tracks in single
+precision). GEANT3 was not modified.
+
+Superseded (kept for the record): an earlier version of this section
+attributed the E2 central-ray offset to GEANT3 as well, before the missing
+SH34/SH35 pair was found.
+
 ## E1/E2: the remaining difference is GEANT3's electrostatic transport
 
 The "6 cm earlier E2 bend" was an artifact of measuring path length from

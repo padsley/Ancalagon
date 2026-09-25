@@ -14,3 +14,8 @@ k39pg_40ca    99.39%                                                 FSLT x -0.2
 Same runs with the old Q14 steering (Q14_STEER_COEFF=0.21): transmission identical;
 o15ag FSLT x +0.088, x' -6.88 mrad; k39pg FSLT x -0.550, DSSSD x -1.188, x' -9.62 mrad.
 The remaining o15ag transmission gap is GEANT3's beam emittance (Ancalagon fires from a point).
+
+After adding the missing SH34/SH35 shift pair around D2 (same runs, RANDOM_SEED=12345):
+o15ag_19ne    96.25%   MSLT 27 / FSLT 1      FSLT x -0.188 / 0.257    DSSSD x -0.349 / 0.617   x' -2.43 mrad
+k39pg_40ca    99.99%   0 / 0                 FSLT x -0.277 / 0.045    DSSSD x -0.341 / 0.270   x' -0.98 mrad
+(GEANT3: o15ag FSLT x -0.222, x' -1.79; k39pg FSLT x -0.288, DSSSD x -0.365, x' -1.16)
