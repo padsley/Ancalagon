@@ -1,0 +1,333 @@
+<title>Ancalagon vs GEANT3: 39K(p,γ)40Ca</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+:root{
+  --bg:#f5f7f9; --surface:#ffffff; --ink:#141a20; --ink-2:#4a5561; --ink-3:#77828d;
+  --rule:#dbe1e7; --grid:#e8ecf0; --axis:#9aa4ae;
+  --g3:#2a78d6; --g4:#eb6834;
+  --good:#1d7a45; --good-bg:#e3f3e9; --bad:#b3261e; --bad-bg:#fbe7e5; --note:#8a5a00; --note-bg:#fbf0d9;
+  --tip-bg:#141a20; --tip-ink:#f5f7f9;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --cond:"IBM Plex Sans Condensed","IBM Plex Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#111418; --surface:#181c21; --ink:#eef1f4; --ink-2:#b3bcc5; --ink-3:#86909a;
+    --rule:#2c333a; --grid:#232a31; --axis:#5d6771;
+    --g3:#3987e5; --g4:#d95926;
+    --good:#6fcf97; --good-bg:#16301f; --bad:#ff8a80; --bad-bg:#3a1a18; --note:#e8b85c; --note-bg:#33280f;
+    --tip-bg:#eef1f4; --tip-ink:#111418;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#111418; --surface:#181c21; --ink:#eef1f4; --ink-2:#b3bcc5; --ink-3:#86909a;
+  --rule:#2c333a; --grid:#232a31; --axis:#5d6771;
+  --g3:#3987e5; --g4:#d95926;
+  --good:#6fcf97; --good-bg:#16301f; --bad:#ff8a80; --bad-bg:#3a1a18; --note:#e8b85c; --note-bg:#33280f;
+  --tip-bg:#eef1f4; --tip-ink:#111418;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans);padding-inline:16px;padding-block:40px 72px}
+.wrap{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:48px}
+.col{max-width:700px}
+header{display:flex;flex-direction:column;gap:14px}
+.eyebrow{font:500 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+h1{font:600 clamp(30px,5vw,44px)/1.1 var(--cond);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font:600 26px/1.2 var(--cond);margin:0;text-wrap:balance}
+h3{font:600 17px/1.3 var(--sans);margin:0}
+p{margin:0}
+.lede{font-size:18px;color:var(--ink-2)}
+.meta{display:flex;flex-wrap:wrap;gap:6px 20px;font:13px/1.5 var(--mono);color:var(--ink-3)}
+.meta b{color:var(--ink-2);font-weight:500}
+section{display:flex;flex-direction:column;gap:18px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.v{background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+.chip{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;font:600 12px/1 var(--sans);letter-spacing:.04em;text-transform:uppercase;padding:6px 9px;border-radius:999px}
+.chip svg{width:12px;height:12px}
+.chip.good{color:var(--good);background:var(--good-bg)}
+.chip.bad{color:var(--bad);background:var(--bad-bg)}
+.chip.note{color:var(--note);background:var(--note-bg)}
+.v p{color:var(--ink-2);font-size:15px}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--rule);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+th,td{padding:9px 14px;text-align:left;border-bottom:1px solid var(--grid)}
+tr:last-child td{border-bottom:0}
+th{font:500 11px/1.3 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);background:transparent}
+td.n{font:14px/1.4 var(--mono);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+th.n{text-align:right}
+td.s{white-space:nowrap}
+.key{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.key.g3{background:var(--g3)} .key.g4{background:var(--g4)}
+figure{margin:0;background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:18px 18px 12px;display:flex;flex-direction:column;gap:10px}
+figcaption{font-size:14px;color:var(--ink-2);max-width:700px}
+figcaption b{color:var(--ink);font-weight:600}
+.fighead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center}
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{fill:var(--ink-3);font:11px var(--mono)}
+.chart .lab{fill:var(--ink-2);font:12px var(--sans)}
+.chart .gridl{stroke:var(--grid);stroke-width:1}
+.chart .axisl{stroke:var(--axis);stroke-width:1}
+.chart .marker{stroke:var(--axis);stroke-width:1;stroke-dasharray:3 3}
+.chart .hair{stroke:var(--ink-3);stroke-width:1;pointer-events:none}
+.tip{position:absolute;pointer-events:none;background:var(--tip-bg);color:var(--tip-ink);font:12px/1.45 var(--sans);padding:8px 10px;border-radius:6px;min-width:150px;box-shadow:0 4px 14px rgba(0,0,0,.18);z-index:2}
+.tip .h{font:11px var(--mono);opacity:.75;margin-bottom:3px}
+.tip .r{display:flex;align-items:center;gap:8px;justify-content:space-between}
+.tip .r i{display:inline-block;width:12px;height:2px;border-radius:1px;margin-right:6px}
+.tip .r b{font:500 12px var(--mono)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+li{color:var(--ink-2)} li b{color:var(--ink);font-weight:600}
+code,.mono{font:14px var(--mono);background:var(--grid);padding:1px 5px;border-radius:4px}
+pre{margin:0;overflow-x:auto;background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:14px 16px;font:13px/1.6 var(--mono);color:var(--ink-2)}
+.fn{font-size:13px;color:var(--ink-3)}
+@media (prefers-reduced-motion:no-preference){.tip{transition:opacity .08s}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">DRAGON · Ancalagon validation</div>
+    <h1>Ancalagon vs GEANT3: 39K(p,γ)40Ca</h1>
+    <p class="lede col">A full-distribution comparison of the GEANT4 port against the GEANT3 DRAGON simulation at the real 2014 hardware tune. Transmission and the BGO array agree closely. The final horizontal focus at FSLT does not.</p>
+    <div class="meta">
+      <span><b>Reaction</b> E<sub>r</sub>(cm) = 606 keV, single 8.934 MeV γ, 40Ca<sup>8+</sup></span>
+      <span><b>Tune</b> dragon_2014_DSSSD, MSLT 0.75 × 1.25 cm</span>
+      <span><b>Events</b> 10 000 per code</span>
+      <span><b>Run</b> 2026-09-25, Ancalagon main @ 50c50e2</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="verdict">
+      <div class="v"><span class="chip note"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Close</span><h3>Transmission</h3><p>99.39 % in GEANT3 against 99.97 % in Ancalagon. Both are near 100 %, but the 0.6-point gap is 7σ: GEANT3 loses 58 reacting recoils to Ancalagon's 3. Where GEANT3 loses them has not been traced.</p></div>
+      <div class="v"><span class="chip good"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Agrees</span><h3>BGO array</h3><p>Hit fraction, spectrum shape and crystal multiplicity match. Ancalagon runs about 1 point high on every efficiency, which is 1–2.5σ.</p></div>
+      <div class="v"><span class="chip bad"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Disagrees</span><h3>Final focus at FSLT</h3><p>GEANT3 focuses at FSLT to 0.12 cm rms. Ancalagon is 1.07 cm rms there, driven by an uncorrected (x|θ) = −2.5 mm/mrad.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Efficiencies</h2>
+    <p class="col">GEANT3 efficiencies are per reacting event: about 5 % of its events never react, because the beam crosses the target off resonance. Counting those gives a false 94.5 % transmission. The BGO numbers apply GEANT3's own digitisation to Ancalagon's hits: energy summed per crystal, crystals under 0.1 MeV dropped, highest crystal first.</p>
+    <div class="tablewrap"><table id="t-eff"><thead><tr><th>Quantity</th><th class="n"><span class="key g3"></span>GEANT3</th><th class="n"><span class="key g4"></span>Ancalagon</th><th class="n">Difference</th></tr></thead><tbody></tbody></table></div>
+    <figure>
+      <div class="fighead"><h3>BGO highest-crystal energy</h3><div class="legend"><span><span class="key g3"></span>GEANT3</span><span><span class="key g4"></span>Ancalagon</span></div></div>
+      <div class="chart" id="c-bgo"></div>
+      <figcaption>Fraction of hit events per 0.1 MeV, log scale. The full-energy peak at 8.93 MeV, the single and double escape structure, and the 511 keV line overlay across the whole range.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>The final horizontal focus</h2>
+    <p class="col">FSLT is designed as an achromatic focus in the horizontal (dispersive) plane. GEANT3 forms that focus at FSLT. Ancalagon's beam is still converging when it reaches the DSSSD, 66 cm further on. The drift from the end of Q14's fringe field to the DSSSD is field-free, so each recoil's straight-line track gives its position anywhere along it.</p>
+    <figure>
+      <div class="fighead"><h3>Horizontal beam size along the final drift</h3><div class="legend"><span><span class="key g3"></span>GEANT3 (375 recoils, global frame)</span><span><span class="key g4"></span>Ancalagon (9 997 recoils)</span></div></div>
+      <div class="chart" id="c-waist"></div>
+      <figcaption><b>GEANT3 reaches its narrowest point 1.2 cm from FSLT; Ancalagon has no minimum before the DSSSD.</b> rms of x relative to the beamline axis, against distance downstream of FSLT.</figcaption>
+    </figure>
+    <div class="two">
+      <figure>
+        <div class="fighead"><h3>Horizontal profile at FSLT</h3></div>
+        <div class="chart" id="c-prof"></div>
+        <figcaption>Fraction of recoils per 0.1 cm. FSLT's jaws are at ±2.25 cm, which is why Ancalagon's wide profile still transmits.</figcaption>
+      </figure>
+      <figure>
+        <div class="fighead"><h3>Single-ray angle fan (Ancalagon)</h3></div>
+        <div class="chart" id="c-fan"></div>
+        <figcaption>x at FSLT for single recoils fired from the target centre at a set horizontal angle. A true focus would be a flat line. <span class="key g4"></span>40Ca<sup>8+</sup> at 1320 MeV/c (solid), 19Ne<sup>4+</sup> at 258 MeV/c for o15ag_19ne (dashed).</figcaption>
+      </figure>
+    </div>
+    <div class="stack col">
+      <h3>What the data say</h3>
+      <ul>
+        <li><b>The width is an angle term.</b> A fit of x at FSLT to the initial recoil angle and momentum over 3 000 real recoils gives (x|θ) = −2.53 mm/mrad. It leaves 0.11 cm rms unexplained. Dispersion (about 0.9 cm per 1 % in dp/p) contributes little.</li>
+        <li><b>Single rays agree with the population.</b> The 40Ca<sup>8+</sup> fan is linear at −2.56 mm/mrad, and its on-axis ray lands 3.4 mm off centre.</li>
+        <li><b>It is not specific to this reaction.</b> 19Ne<sup>4+</sup> rays for o15ag_19ne show about −2.5 mm/mrad too, plus a 1.5 cm jump between −1 and 0 mrad. That jump looks like a boundary between overlapping quad field volumes.</li>
+        <li><b>This contradicts the 2026-09-20 validation</b>, which recorded −0.21 mm/mrad at FSLT after the quad-container fix. That figure does not reproduce with real-species rays fired from the target.</li>
+        <li><b>Consequence:</b> transmission is unaffected only because FSLT and the DSSSD are wide. Ancalagon's DSSSD position and angle distributions should not be used until this is fixed. It may also contribute to the 58 % o15ag_19ne transmission; that has not been checked.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Phase space at FSLT and the DSSSD</h2>
+    <p class="col">Global coordinates, relative to the beamline axis at x = −1024.717 cm. GEANT3's own ENDV histograms are centred on its ENDV volume, which sits about 3.6 mm from Ancalagon's DSSSD, so they are not used for centroids.</p>
+    <div class="tablewrap"><table id="t-opt"><thead><tr><th>Quantity</th><th class="n"><span class="key g3"></span>GEANT3</th><th class="n"><span class="key g4"></span>Ancalagon</th><th>Reading</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Differences that are not bugs</h2>
+    <ul class="col">
+      <li><b>Beam model.</b> Ancalagon fires every recoil from a point with no beam emittance. GEANT3 includes a 1.16 mm rms beam spot, 1.1 mrad beam divergence and a 1.1 cm rms spread of interaction points along the gas target. This is why Ancalagon's vertical spot at the DSSSD is smaller (0.07 against 0.20 cm). The recoil cone itself matches: 5.3 against 5.5 mrad mean.</li>
+      <li><b>MCP foils.</b> Neither code models them, so they play no part in the difference.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Reproduce</h2>
+    <p class="col">Everything is in <code>validate/g3_crosscheck_k39pg/</code> in the Ancalagon repository.</p>
+<pre>./run_g3.sh &lt;workdir&gt;          # 8 × 1250 GEANT3 events, plus 400 in the global frame
+./run_ancalagon.sh &lt;workdir&gt;   # 10k reaction events, trajectory extracts, angle fans
+python3 analyze.py             # results/summary.txt, compare.png, chart_data.json</pre>
+    <ul class="col">
+      <li><b><code>--track-chain</code> now fires the reaction's own recoil species</b> (RECL Z, A and charge state), not a hard-coded neon ion. Give the matched momentum and fire from the target centre, for example <code>--track-chain 0 0 1320 1 0.0</code> for k39pg_40ca.</li>
+      <li><b>GEANT3 run notes.</b> <code>dsbatch</code> truncates FFCARD, INPUT and MITRAY paths at 80 characters. The FOCUSTEST print in <code>src/gustep_mitray.f</code> fires on every recoil step, not only in single-ray runs. Histogram h15 (recoil energy) spans 0–20 MeV and misses these 23 MeV recoils.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+const DATA = {"rows": [{"label": "Recoil reaches DSSSD", "g3": [99.39024390243902, 0.07982042454323639], "g4": [99.97, 0.017317909804591518]}, {"label": "BGO: any crystal hit", "g3": [71.11017661900758, 0.46473181119960444], "g4": [71.88, 0.4495848751904361]}, {"label": "BGO: highest crystal > 2 MeV", "g3": [61.122792262405376, 0.4998195103468845], "g4": [62.1, 0.4851381246614206]}, {"label": "BGO: highest crystal > 5 MeV", "g3": [51.850294365012616, 0.5123143380254626], "g4": [53.080000000000005, 0.49905045837069417]}, {"label": "BGO: full-energy sum > 8.63 MeV", "g3": [30.267031118587045, 0.47105115030008315], "g4": [31.900000000000002, 0.466089047286031]}, {"label": "DSSSD and highest BGO > 2 MeV", "g3": [60.97560975609756, 0.5001614531677208], "g4": [62.09, 0.48516305506499563]}], "optics": [{"label": "x at FSLT, rms (cm)", "g3": 0.1245, "g4": 1.0691}, {"label": "x at FSLT, mean (cm)", "g3": -0.2885, "g4": 0.2669}, {"label": "x at DSSSD, rms (cm)", "g3": 0.3179, "g4": 0.8897}, {"label": "x at DSSSD, mean (cm)", "g3": -0.3653, "g4": -0.4792}, {"label": "x' at DSSSD, mean (mrad)", "g3": -1.1585, "g4": -11.2534}, {"label": "x' at DSSSD, rms (mrad)", "g3": 4.5044, "g4": 2.9585}, {"label": "y at DSSSD, rms (cm)", "g3": 0.1972, "g4": 0.0697}, {"label": "y' at DSSSD, rms (mrad)", "g3": 3.7373, "g4": 3.4971}, {"label": "x waist position z (cm)", "g3": -7.2379, "g4": -72.37}], "waist": {"dist": [-116.08, -115.07, -114.07, -113.07, -112.07, -111.07, -110.06, -109.06, -108.06, -107.06, -106.05, -105.05, -104.05, -103.05, -102.05, -101.04, -100.04, -99.04, -98.04, -97.04, -96.03, -95.03, -94.03, -93.03, -92.03, -91.02, -90.02, -89.02, -88.02, -87.02, -86.01, -85.01, -84.01, -83.01, -82.01, -81.0, -80.0, -79.0, -78.0, -77.0, -75.99, -74.99, -73.99, -72.99, -71.99, -70.98, -69.98, -68.98, -67.98, -66.98, -65.97, -64.97, -63.97, -62.97, -61.97, -60.96, -59.96, -58.96, -57.96, -56.96, -55.95, -54.95, -53.95, -52.95, -51.95, -50.94, -49.94, -48.94, -47.94, -46.94, -45.93, -44.93, -43.93, -42.93, -41.92, -40.92, -39.92, -38.92, -37.92, -36.91, -35.91, -34.91, -33.91, -32.91, -31.9, -30.9, -29.9, -28.9, -27.9, -26.89, -25.89, -24.89, -23.89, -22.89, -21.88, -20.88, -19.88, -18.88, -17.88, -16.87, -15.87, -14.87, -13.87, -12.87, -11.86, -10.86, -9.86, -8.86, -7.86, -6.85, -5.85, -4.85, -3.85, -2.85, -1.84, -0.84, 0.16, 1.16, 2.16, 3.17, 4.17, 5.17, 6.17, 7.17, 8.18, 9.18, 10.18, 11.18, 12.18, 13.19, 14.19, 15.19, 16.19, 17.2, 18.2, 19.2, 20.2, 21.2, 22.21, 23.21, 24.21, 25.21, 26.21, 27.22, 28.22, 29.22, 30.22, 31.22, 32.23, 33.23, 34.23, 35.23, 36.23, 37.24, 38.24, 39.24, 40.24, 41.24, 42.25, 43.25, 44.25, 45.25, 46.25, 47.26, 48.26, 49.26, 50.26, 51.26, 52.27, 53.27, 54.27, 55.27, 56.27, 57.28, 58.28, 59.28, 60.28, 61.28, 62.29, 63.29, 64.29, 65.29, 66.29], "g3": [0.5433, 0.539, 0.5346, 0.5302, 0.5258, 0.5214, 0.517, 0.5126, 0.5083, 0.5039, 0.4995, 0.4951, 0.4908, 0.4864, 0.4821, 0.4777, 0.4733, 0.469, 0.4646, 0.4603, 0.4559, 0.4516, 0.4473, 0.4429, 0.4386, 0.4343, 0.43, 0.4256, 0.4213, 0.417, 0.4127, 0.4084, 0.4041, 0.3998, 0.3955, 0.3912, 0.387, 0.3827, 0.3784, 0.3742, 0.3699, 0.3657, 0.3614, 0.3572, 0.353, 0.3487, 0.3445, 0.3403, 0.3361, 0.3319, 0.3278, 0.3236, 0.3194, 0.3153, 0.3111, 0.307, 0.3029, 0.2988, 0.2947, 0.2906, 0.2865, 0.2825, 0.2784, 0.2744, 0.2704, 0.2664, 0.2624, 0.2584, 0.2545, 0.2505, 0.2466, 0.2427, 0.2389, 0.235, 0.2312, 0.2274, 0.2237, 0.2199, 0.2162, 0.2125, 0.2089, 0.2053, 0.2017, 0.1982, 0.1947, 0.1912, 0.1878, 0.1845, 0.1812, 0.1779, 0.1747, 0.1716, 0.1685, 0.1655, 0.1625, 0.1597, 0.1569, 0.1542, 0.1516, 0.149, 0.1466, 0.1442, 0.142, 0.1399, 0.1379, 0.136, 0.1342, 0.1326, 0.1311, 0.1298, 0.1285, 0.1275, 0.1266, 0.1258, 0.1252, 0.1248, 0.1245, 0.1244, 0.1244, 0.1247, 0.125, 0.1256, 0.1263, 0.1271, 0.1281, 0.1293, 0.1306, 0.132, 0.1336, 0.1353, 0.1372, 0.1391, 0.1412, 0.1434, 0.1457, 0.1481, 0.1506, 0.1532, 0.1559, 0.1586, 0.1615, 0.1644, 0.1674, 0.1704, 0.1736, 0.1767, 0.18, 0.1833, 0.1866, 0.19, 0.1934, 0.1969, 0.2004, 0.204, 0.2076, 0.2112, 0.2149, 0.2186, 0.2223, 0.226, 0.2298, 0.2336, 0.2375, 0.2413, 0.2452, 0.2491, 0.253, 0.257, 0.2609, 0.2649, 0.2689, 0.2729, 0.2769, 0.281, 0.285, 0.2891, 0.2932, 0.2973, 0.3014, 0.3055, 0.3096, 0.3137, 0.3179], "g4": [1.3941, 1.3913, 1.3884, 1.3856, 1.3828, 1.3799, 1.3771, 1.3742, 1.3714, 1.3686, 1.3657, 1.3629, 1.36, 1.3572, 1.3544, 1.3515, 1.3487, 1.3459, 1.343, 1.3402, 1.3374, 1.3345, 1.3317, 1.3289, 1.326, 1.3232, 1.3204, 1.3175, 1.3147, 1.3119, 1.3091, 1.3062, 1.3034, 1.3006, 1.2978, 1.2949, 1.2921, 1.2893, 1.2865, 1.2836, 1.2808, 1.278, 1.2752, 1.2724, 1.2695, 1.2667, 1.2639, 1.2611, 1.2583, 1.2555, 1.2526, 1.2498, 1.247, 1.2442, 1.2414, 1.2386, 1.2358, 1.233, 1.2301, 1.2273, 1.2245, 1.2217, 1.2189, 1.2161, 1.2133, 1.2105, 1.2077, 1.2049, 1.2021, 1.1993, 1.1965, 1.1937, 1.1909, 1.1881, 1.1853, 1.1825, 1.1797, 1.1769, 1.1741, 1.1713, 1.1685, 1.1657, 1.163, 1.1602, 1.1574, 1.1546, 1.1518, 1.149, 1.1462, 1.1435, 1.1407, 1.1379, 1.1351, 1.1323, 1.1295, 1.1268, 1.124, 1.1212, 1.1184, 1.1157, 1.1129, 1.1101, 1.1073, 1.1046, 1.1018, 1.099, 1.0963, 1.0935, 1.0907, 1.088, 1.0852, 1.0825, 1.0797, 1.0769, 1.0742, 1.0714, 1.0687, 1.0659, 1.0631, 1.0604, 1.0576, 1.0549, 1.0521, 1.0494, 1.0466, 1.0439, 1.0412, 1.0384, 1.0357, 1.0329, 1.0302, 1.0274, 1.0247, 1.022, 1.0192, 1.0165, 1.0138, 1.011, 1.0083, 1.0056, 1.0029, 1.0001, 0.9974, 0.9947, 0.992, 0.9892, 0.9865, 0.9838, 0.9811, 0.9784, 0.9757, 0.9729, 0.9702, 0.9675, 0.9648, 0.9621, 0.9594, 0.9567, 0.954, 0.9513, 0.9486, 0.9459, 0.9432, 0.9405, 0.9378, 0.9351, 0.9324, 0.9298, 0.9271, 0.9244, 0.9217, 0.919, 0.9164, 0.9137, 0.911, 0.9083, 0.9057, 0.903, 0.9003, 0.8977, 0.895, 0.8923, 0.8897]}, "xfslt": {"edges": [-3.0, -2.9, -2.8, -2.7, -2.6, -2.5, -2.4, -2.3, -2.2, -2.1, -2.0, -1.9, -1.8, -1.7, -1.6, -1.5, -1.4, -1.3, -1.2, -1.1, -1.0, -0.9, -0.8, -0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0], "g3": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.00533, 0.03733, 0.128, 0.312, 0.28267, 0.16, 0.072, 0.00267, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "g4": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0001, 0.0, 0.0009, 0.0043, 0.0162, 0.02331, 0.02521, 0.02621, 0.02241, 0.02221, 0.02571, 0.02251, 0.02281, 0.02191, 0.02271, 0.02291, 0.02491, 0.02441, 0.02761, 0.02861, 0.02551, 0.02671, 0.02591, 0.02781, 0.02961, 0.02831, 0.02951, 0.02911, 0.02841, 0.03341, 0.02751, 0.02871, 0.02741, 0.02981, 0.03111, 0.02941, 0.02981, 0.02821, 0.03001, 0.02881, 0.02731, 0.0113, 0.0014, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}, "fan": {"ca": [[-4, 1.2926506662350903], [-2, 0.8194055681749433], [-1, 0.5911074728271615], [0, 0.34404565672707577], [1, 0.06615833206637944], [2, -0.19307615782713583], [4, -0.7579605734604229]], "ne": [[-2, 1.4684845649678664], [-1, 1.2196537318048968], [0, -0.25882165063558205], [1, -0.5014538669981903], [2, -0.7693154466101078]], "slope_mm_per_mrad": -2.56, "fit_slope_mm_per_mrad": -2.533, "fit_resid_cm": 0.106}, "bgo": {"edges": [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5.0, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.0, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 7.0, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.0, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 9.0, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 10.0], "g3": [0.0, 0.00606, 0.00917, 0.0102, 0.01138, 0.03814, 0.00769, 0.00754, 0.00532, 0.00532, 0.00488, 0.00547, 0.00325, 0.00325, 0.00473, 0.00429, 0.00251, 0.00399, 0.00399, 0.00325, 0.0034, 0.00458, 0.0031, 0.00237, 0.0031, 0.0031, 0.00414, 0.00473, 0.0037, 0.00399, 0.00414, 0.00488, 0.0037, 0.00384, 0.0034, 0.0034, 0.00488, 0.00281, 0.00695, 0.00325, 0.00458, 0.00444, 0.00399, 0.00444, 0.00547, 0.00606, 0.00532, 0.00739, 0.0071, 0.00414, 0.00591, 0.00857, 0.00577, 0.00651, 0.00724, 0.00517, 0.00517, 0.00636, 0.0068, 0.00931, 0.00784, 0.00843, 0.0071, 0.00828, 0.00931, 0.00739, 0.00798, 0.00961, 0.00902, 0.01227, 0.0105, 0.01035, 0.01257, 0.01375, 0.01552, 0.01464, 0.01508, 0.01538, 0.01582, 0.01804, 0.01804, 0.02898, 0.03548, 0.03652, 0.03341, 0.02765, 0.04332, 0.05027, 0.03947, 0.03785, 0.03578, 0.03474, 0.01198, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "g4": [0.0, 0.0089, 0.01002, 0.01155, 0.01029, 0.03784, 0.00682, 0.00765, 0.00556, 0.00459, 0.00487, 0.00348, 0.0025, 0.00237, 0.00362, 0.00362, 0.0032, 0.00376, 0.00306, 0.00237, 0.00334, 0.00334, 0.0039, 0.00543, 0.00223, 0.00264, 0.00334, 0.00417, 0.0039, 0.00292, 0.00445, 0.0032, 0.00306, 0.00237, 0.0039, 0.0039, 0.00459, 0.0039, 0.00556, 0.00334, 0.00543, 0.00556, 0.00556, 0.00417, 0.00417, 0.00515, 0.0064, 0.00556, 0.00487, 0.00515, 0.00543, 0.00501, 0.00403, 0.00598, 0.00737, 0.00654, 0.00793, 0.00626, 0.00737, 0.00529, 0.00904, 0.0064, 0.00668, 0.00751, 0.00723, 0.00904, 0.01169, 0.00974, 0.00904, 0.00793, 0.00946, 0.01196, 0.01196, 0.01113, 0.01322, 0.01349, 0.01447, 0.01558, 0.01725, 0.01669, 0.01669, 0.03116, 0.03937, 0.03715, 0.03812, 0.03478, 0.04466, 0.05064, 0.04535, 0.03478, 0.03728, 0.03603, 0.01169, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], "g3_frac": 0.7111, "g4_frac": 0.7188}, "n": {"g3_all": 10000, "g3": 9512, "g3_global": 375, "g4": 10000, "fit": 2999}};
+const $ = (s) => document.querySelector(s);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (v, d) => (v >= 0 ? "" : "−") + Math.abs(v).toFixed(d);
+
+// tables
+(function () {
+  const tb = $("#t-eff tbody");
+  for (const r of DATA.rows) {
+    const tr = document.createElement("tr");
+    const d = r.g4[0] - r.g3[0], s = Math.hypot(r.g3[1], r.g4[1]);
+    [[r.label, ""], [r.g3[0].toFixed(2) + " ± " + r.g3[1].toFixed(2) + " %", "n"],
+     [r.g4[0].toFixed(2) + " ± " + r.g4[1].toFixed(2) + " %", "n"],
+     [(d >= 0 ? "+" : "−") + Math.abs(d).toFixed(2) + " (" + (Math.abs(d) / s).toFixed(1) + "σ)", "n"]]
+      .forEach(([t, c]) => { const td = document.createElement("td"); td.textContent = t; if (c) td.className = c; tr.appendChild(td); });
+    tb.appendChild(tr);
+  }
+  const reading = {
+    "x at FSLT, rms (cm)": ["bad", "8.6× wider"], "x at FSLT, mean (cm)": ["bad", "5.6 mm apart"],
+    "x at DSSSD, rms (cm)": ["bad", "2.8× wider"], "x at DSSSD, mean (cm)": ["good", "1.1 mm apart"],
+    "x' at DSSSD, mean (mrad)": ["bad", "10 mrad apart"], "x' at DSSSD, rms (mrad)": ["note", "point source"],
+    "y at DSSSD, rms (cm)": ["note", "point source"], "y' at DSSSD, rms (mrad)": ["good", "close"],
+    "x waist position z (cm)": ["bad", "no waist"],
+  };
+  const labels = { bad: "Disagrees", good: "Agrees", note: "Input difference" };
+  const to = $("#t-opt tbody");
+  for (const r of DATA.optics) {
+    const tr = document.createElement("tr");
+    const isZ = r.label.startsWith("x waist");
+    const cells = [r.label, isZ ? "z = " + fmt(r.g3, 1) + " (FSLT)" : fmt(r.g3, 3), isZ ? "beyond DSSSD" : fmt(r.g4, 3)];
+    cells.forEach((t, i) => { const td = document.createElement("td"); td.textContent = t; if (i) td.className = "n"; tr.appendChild(td); });
+    const [k, txt] = reading[r.label] || ["note", ""];
+    const td = document.createElement("td"); td.className = "s";
+    const chip = document.createElement("span"); chip.className = "chip " + k; chip.textContent = labels[k];
+    const sp = document.createElement("span"); sp.className = "fn"; sp.textContent = "  " + txt;
+    td.append(chip, sp); tr.appendChild(td); to.appendChild(tr);
+  }
+})();
+
+// minimal chart kit: line/step series, one y-scale, crosshair tooltip
+function chart(el, o) {
+  const W = o.w || 900, Hh = o.h || 320, m = { l: 56, r: 16, t: 14, b: 44 };
+  const pw = W - m.l - m.r, ph = Hh - m.t - m.b;
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", `0 0 ${W} ${Hh}`); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", o.aria);
+  const mk = (t, a, p = svg) => { const e = document.createElementNS(ns, t); for (const k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; };
+  const [x0, x1] = o.x, [y0, y1] = o.y;
+  const ly = (v) => o.log ? Math.log10(Math.max(v, 10 ** y0)) : v;
+  const X = (v) => m.l + (v - x0) / (x1 - x0) * pw;
+  const Y = (v) => m.t + ph - (ly(v) - (o.log ? y0 : y0)) / ((o.log ? y1 : y1) - (o.log ? y0 : y0)) * ph;
+  for (const t of o.yt) {
+    const yy = o.log ? m.t + ph - (t - y0) / (y1 - y0) * ph : Y(t);
+    mk("line", { x1: m.l, x2: m.l + pw, y1: yy, y2: yy, class: "gridl" });
+    const tx = mk("text", { x: m.l - 8, y: yy + 4, "text-anchor": "end" }); tx.textContent = o.log ? (t === 0 ? "1" : "10" + (t < 0 ? "⁻" : "") + "⁰¹²³⁴⁵⁶⁷⁸⁹"[Math.abs(t)]) : o.yf(t);
+  }
+  mk("line", { x1: m.l, x2: m.l + pw, y1: m.t + ph, y2: m.t + ph, class: "axisl" });
+  for (const t of o.xt) {
+    mk("line", { x1: X(t), x2: X(t), y1: m.t + ph, y2: m.t + ph + 4, class: "axisl" });
+    const tx = mk("text", { x: X(t), y: m.t + ph + 18, "text-anchor": "middle" }); tx.textContent = o.xf ? o.xf(t) : t;
+  }
+  const xl = mk("text", { x: m.l + pw / 2, y: Hh - 4, "text-anchor": "middle", class: "lab" }); xl.textContent = o.xlabel;
+  const yl = mk("text", { x: 14, y: m.t + ph / 2, "text-anchor": "middle", class: "lab", transform: `rotate(-90 14 ${m.t + ph / 2})` }); yl.textContent = o.ylabel;
+  for (const mkr of o.markers || []) {
+    mk("line", { x1: X(mkr.x), x2: X(mkr.x), y1: m.t, y2: m.t + ph, class: "marker" });
+    const t = mk("text", { x: X(mkr.x) + 5, y: m.t + 12, class: "lab" }); t.textContent = mkr.label;
+  }
+  for (const s of o.series) {
+    let d = "";
+    s.pts.forEach(([a, b], i) => { d += (i ? "L" : "M") + X(a).toFixed(1) + " " + Y(b).toFixed(1); });
+    mk("path", { d, fill: "none", stroke: css(s.color), "stroke-width": s.w || 2, "stroke-dasharray": s.dash || "", "stroke-linejoin": "round", "stroke-linecap": "round" });
+    if (s.dots) for (const [a, b] of s.pts) mk("circle", { cx: X(a), cy: Y(b), r: 4.5, fill: s.hollow ? css("--surface") : css(s.color), stroke: css(s.color), "stroke-width": 2 });
+  }
+  // hover layer
+  const hair = mk("line", { y1: m.t, y2: m.t + ph, class: "hair", opacity: 0 });
+  const hit = mk("rect", { x: m.l, y: m.t, width: pw, height: ph, fill: "transparent", tabindex: 0 });
+  const tip = document.createElement("div"); tip.className = "tip"; tip.style.opacity = 0; el.appendChild(tip);
+  el.appendChild(svg);
+  function show(px) {
+    const xv = x0 + (px - m.l) / pw * (x1 - x0);
+    const idx = o.snap(xv); if (idx == null) return hide();
+    hair.setAttribute("x1", X(idx.x)); hair.setAttribute("x2", X(idx.x)); hair.setAttribute("opacity", 1);
+    tip.replaceChildren();
+    const h = document.createElement("div"); h.className = "h"; h.textContent = idx.head; tip.appendChild(h);
+    for (const row of idx.rows) {
+      const r = document.createElement("div"); r.className = "r";
+      const l = document.createElement("span"); const i = document.createElement("i"); i.style.background = css(row.color); l.append(i, document.createTextNode(row.name));
+      const b = document.createElement("b"); b.textContent = row.val; r.append(b, l); tip.appendChild(r);
+    }
+    const rect = svg.getBoundingClientRect(), sc = rect.width / W;
+    let left = X(idx.x) * sc + 12; if (left + 180 > rect.width) left = X(idx.x) * sc - 190;
+    tip.style.left = Math.max(0, left) + "px"; tip.style.top = (m.t * sc + 4) + "px"; tip.style.opacity = 1;
+  }
+  function hide() { hair.setAttribute("opacity", 0); tip.style.opacity = 0; }
+  hit.addEventListener("pointermove", (e) => { const r = svg.getBoundingClientRect(); show((e.clientX - r.left) * W / r.width); });
+  hit.addEventListener("pointerleave", hide);
+  hit.addEventListener("focus", () => show(m.l + pw / 2)); hit.addEventListener("blur", hide);
+}
+const nearest = (arr, v) => { let b = 0; for (let i = 1; i < arr.length; i++) if (Math.abs(arr[i] - v) < Math.abs(arr[b] - v)) b = i; return b; };
+const steps = (edges, vals) => { const p = []; vals.forEach((v, i) => { p.push([edges[i], v], [edges[i + 1], v]); }); return p; };
+
+function draw() {
+  for (const id of ["#c-waist", "#c-prof", "#c-fan", "#c-bgo"]) $(id).replaceChildren();
+  const w = DATA.waist;
+  chart($("#c-waist"), {
+    aria: "Horizontal beam rms against distance downstream of FSLT for GEANT3 and Ancalagon",
+    x: [-120, 70], y: [0, 1.5], xt: [-100, -75, -50, -25, 0, 25, 50], yt: [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5],
+    yf: (t) => t.toFixed(2), xlabel: "distance downstream of FSLT (cm)", ylabel: "x rms (cm)",
+    markers: [{ x: 0, label: "FSLT" }, { x: 66.3, label: "DSSSD" }],
+    series: [{ color: "--g3", pts: w.dist.map((d, i) => [d, w.g3[i]]) }, { color: "--g4", pts: w.dist.map((d, i) => [d, w.g4[i]]) }],
+    snap: (v) => { const i = nearest(w.dist, v); return { x: w.dist[i], head: w.dist[i].toFixed(1) + " cm from FSLT",
+      rows: [{ name: "GEANT3", color: "--g3", val: w.g3[i].toFixed(3) + " cm" }, { name: "Ancalagon", color: "--g4", val: w.g4[i].toFixed(3) + " cm" }] }; },
+  });
+  const pr = DATA.xfslt, ctr = pr.edges.slice(0, -1).map((e, i) => (e + pr.edges[i + 1]) / 2);
+  chart($("#c-prof"), {
+    w: 460, h: 300, aria: "Horizontal profile at FSLT for both codes",
+    x: [-3, 3], y: [0, 0.35], xt: [-3, -2, -1, 0, 1, 2, 3], yt: [0, 0.1, 0.2, 0.3], yf: (t) => t.toFixed(1),
+    xlabel: "x at FSLT (cm)", ylabel: "fraction per 0.1 cm",
+    markers: [{ x: -2.25, label: "" }, { x: 2.25, label: "jaw" }],
+    series: [{ color: "--g3", pts: steps(pr.edges, pr.g3) }, { color: "--g4", pts: steps(pr.edges, pr.g4) }],
+    snap: (v) => { const i = nearest(ctr, v); return { x: ctr[i], head: "x = " + pr.edges[i].toFixed(1) + " to " + pr.edges[i + 1].toFixed(1) + " cm",
+      rows: [{ name: "GEANT3", color: "--g3", val: (100 * pr.g3[i]).toFixed(1) + " %" }, { name: "Ancalagon", color: "--g4", val: (100 * pr.g4[i]).toFixed(1) + " %" }] }; },
+  });
+  const f = DATA.fan, angs = [...new Set([...f.ca.map((p) => p[0]), ...f.ne.map((p) => p[0])])].sort((a, b) => a - b);
+  chart($("#c-fan"), {
+    w: 460, h: 300, aria: "Ancalagon x at FSLT against initial angle for 40Ca8+ and 19Ne4+ single rays",
+    x: [-4.5, 4.5], y: [-1, 1.6], xt: [-4, -2, 0, 2, 4], yt: [-1, -0.5, 0, 0.5, 1, 1.5], yf: (t) => t.toFixed(1),
+    xlabel: "initial horizontal angle (mrad)", ylabel: "x at FSLT (cm)",
+    series: [{ color: "--g4", pts: f.ca, dots: true }, { color: "--g4", pts: f.ne, dots: true, hollow: true, dash: "5 4", w: 1.5 }],
+    snap: (v) => { const a = angs[nearest(angs, v)]; const c = f.ca.find((p) => p[0] === a), n = f.ne.find((p) => p[0] === a);
+      const rows = []; if (c) rows.push({ name: "40Ca⁸⁺", color: "--g4", val: fmt(c[1], 3) + " cm" }); if (n) rows.push({ name: "19Ne⁴⁺", color: "--g4", val: fmt(n[1], 3) + " cm" });
+      return { x: a, head: (a > 0 ? "+" : a < 0 ? "−" : "") + Math.abs(a) + " mrad", rows }; },
+  });
+  const b = DATA.bgo, bc = b.edges.slice(0, -1).map((e, i) => (e + b.edges[i + 1]) / 2);
+  chart($("#c-bgo"), {
+    h: 300, log: true, aria: "BGO highest-crystal energy spectra for both codes, log scale",
+    x: [0, 10], y: [-3, -1], xt: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], yt: [-3, -2, -1], xlabel: "highest-crystal energy (MeV)", ylabel: "fraction per 0.1 MeV",
+    markers: [{ x: 8.934, label: "8.93 MeV" }],
+    series: [{ color: "--g3", pts: steps(b.edges, b.g3), w: 1.5 }, { color: "--g4", pts: steps(b.edges, b.g4), w: 1.5 }],
+    snap: (v) => { const i = nearest(bc, v); return { x: bc[i], head: b.edges[i].toFixed(1) + "–" + b.edges[i + 1].toFixed(1) + " MeV",
+      rows: [{ name: "GEANT3", color: "--g3", val: (100 * b.g3[i]).toFixed(2) + " %" }, { name: "Ancalagon", color: "--g4", val: (100 * b.g4[i]).toFixed(2) + " %" }] }; },
+  });
+}
+draw();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>

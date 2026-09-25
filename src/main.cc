@@ -455,15 +455,23 @@ G4RunManager* BuildRunManager(const std::string& element, double x0Cm, double y0
     // m/q = 4.758 u/e, i.e. (for q=4e) m = 19.03u -- a 19Ne4+ recoil,
     // consistent with this file's own comments about a 19Ne reaction.
     //
+    // The fired ion is the reaction's own recoil species (RECL card: Z, A,
+    // charge state) for whichever reaction REACTION_INPUT points to -- the
+    // same file the "Chain" geometry was just retuned for -- so e.g.
+    // k39pg_40ca fires 40Ca8+, not a neon stand-in. For the bundled
+    // o15ag_19ne this is 19Ne4+, the original hardcoded design ion.
+    const ReactionConfig chainCfg = ReactionConfig::Load(ReactionFilePath());
+    const int ionZ = chainCfg.recoil.Z;
+    const int ionChargeState = chainCfg.recoilChargeState;
     // Diagnostic-only override of the fired ion's own mass number (A),
-    // element (Z) held fixed at neon (10) -- for mass-resolving-power
-    // studies: firing neighbouring Ne isotopes (18/19/20/21) at design
-    // charge state and design momentum tests how far the separator's own
-    // M-E-E-M optics actually separate different masses at fixed p/q,
-    // cross-checkable against the paper's own first-order M/dM figure.
-    // Defaults to the real 19Ne, so omitting it changes nothing.
+    // element (Z) and charge state held fixed at the recoil's -- for
+    // mass-resolving-power studies: firing neighbouring isotopes at the
+    // recoil's charge state and a fixed momentum tests how far the
+    // separator's own M-E-E-M optics actually separate different masses at
+    // fixed p/q, cross-checkable against the paper's own first-order M/dM
+    // figure. Defaults to the recoil's own A, so omitting it changes nothing.
     const char* trackChainAEnv = std::getenv("TRACK_CHAIN_A");
-    const int trackChainA = trackChainAEnv ? std::atoi(trackChainAEnv) : 19;
+    const int trackChainA = trackChainAEnv ? std::atoi(trackChainAEnv) : chainCfg.recoil.A;
     // Diagnostic-only initial horizontal angle (degrees, dispersive plane)
     // -- for testing whether a given point along the chain is a genuine
     // angle-independent focus: fire the same x0/z0 at several angles and
@@ -471,12 +479,12 @@ G4RunManager* BuildRunManager(const std::string& element, double x0Cm, double y0
     // ahead), so omitting it changes nothing.
     const char* trackChainAngleEnv = std::getenv("TRACK_CHAIN_ANGLE_DEG");
     const double trackChainAngleDeg = trackChainAngleEnv ? std::atof(trackChainAngleEnv) : 0.0;
-    runManager->SetUserAction(
-        new PrimaryGeneratorAction(x0Cm, y0Cm, pMeV, z0Cm, 10, trackChainA, 4, trackChainAngleDeg));
+    runManager->SetUserAction(new PrimaryGeneratorAction(x0Cm, y0Cm, pMeV, z0Cm, ionZ, trackChainA,
+                                                         ionChargeState, trackChainAngleDeg));
     // See SteppingAction's own comment: without this, G4ionIonisation's
     // effective-charge model silently drifts this ion's tracked charge
-    // away from its real, fixed 4+ state, corrupting every bend downstream.
-    runManager->SetUserAction(new SteppingAction(4.0));
+    // away from its real, fixed charge state, corrupting every bend downstream.
+    runManager->SetUserAction(new SteppingAction(static_cast<double>(ionChargeState)));
   } else {
     runManager->SetUserAction(new PrimaryGeneratorAction(x0Cm, y0Cm, pMeV, z0Cm));
     runManager->SetUserAction(new SteppingAction());
