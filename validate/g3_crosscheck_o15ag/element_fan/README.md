@@ -62,10 +62,35 @@ in `run_fans.sh`); the earlier columns were coarse-stepped, which is exact
 only where the World carried no field. (a|θ) also agrees to <1 % through
 RC40, 5–8 % after E2.
 
-Still open: the on-axis ray is 0.6 mm apart at RC40 and 5.7 mm apart by
-RC55. Through E2 its direction runs a constant 24 mrad ahead of GEANT3's,
-i.e. Ancalagon's E2 bend starts ~6 cm earlier along the path, although both
-codes put E2's entrance EFB at the same chain position and bend at the same
-radius. GEANT3 builds its e-dipole volume and A-frame from a trapezoid
-construction (`ugeo_edipol` in `ugeom_mitray.f`) that may place the A-frame
-differently from the deck; not yet traced. E1 (smaller bend) agrees.
+## E1/E2: the remaining difference is GEANT3's electrostatic transport
+
+The "6 cm earlier E2 bend" was an artifact of measuring path length from
+RC40: measured from each code's own crossing of E2's entrance EFB, the
+curvature profiles along the on-axis ray agree (full field 1/250 cm⁻¹ in
+both; Ancalagon's entrance fringe up to ~10 % stronger at the EFB). GEANT3's
+e-dipole A-frame (`ugeo_edipol`) works out exactly at the deck's entrance
+point and direction when Z11 = Z22, as Ancalagon places it.
+
+Section tests (`run_section_plane.sh`, `section_matrix.py`) launch identical
+rays at a field-free plane in both codes -- GEANT3's own on-axis state plus
+±0.2 cm and ±2 mrad -- and measure the element's (x, a) transfer matrix, with
+angles from two field-free planes (Ancalagon prints z to 1e-4 cm, too coarse
+for single-step directions). Phase-space conservation requires det ≈ 1:
+
+| section (launch → planes) | det GEANT3 | det Ancalagon | largest difference |
+|---|---|---|---|
+| Q8–Q10 + D2 (MSLT → RC40, RC42) | 0.980 | 0.999 | none (≤ 0.5 %) |
+| E1 (RC25 → MSLT, RC28) | 1.075 | 0.999 | (a\|a) 0.887 vs 0.811 |
+| E2 (RC49 → RC51, RC55) | 1.305 | 0.999 | (a\|a) 0.837 vs 0.539 |
+
+Magnetic transport agrees; GEANT3's electrostatic transport does not conserve
+phase space. Its energy bookkeeping is also off: with a temporary momentum
+column in FOCUSTEST (reverted), a ray entering E2 3.19 mm off-orbit should
+lose qE0·u ≈ 4.5 keV; Ancalagon gives −4.2 keV, GEANT3 −1.4 keV. GEANT3's
+gradient across the gap is right (13.8 keV/cm) but its zero sits ~2 mm off
+the design orbit. The likely source is `grkuta.f`'s 1997 electric-field
+extension (a Nyström step treating the E impulse as a direction kick, with
+the momentum magnitude averaged from two stage estimates) together with
+`gthion.f` applying the momentum change only when it exceeds 1 keV/c per step.
+Not traced further. The E1/E2 differences, the on-axis offset after E2
+(5.7 mm at RC55) and the residual at FSLT are therefore not Ancalagon bugs.
