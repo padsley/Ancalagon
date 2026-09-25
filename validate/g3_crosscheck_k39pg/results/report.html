@@ -98,17 +98,17 @@ pre{margin:0;overflow-x:auto;background:var(--surface);border:1px solid var(--ru
   <header>
     <div class="eyebrow">DRAGON · Ancalagon validation</div>
     <h1>Ancalagon vs GEANT3</h1>
-    <p class="lede col">A full-distribution comparison of the GEANT4 port against the GEANT3 DRAGON simulation, for two reactions at the real 2014 hardware tune. It exposed two geometry bugs in Ancalagon that destroyed the angle-independent foci at MSLT and FSLT. With both fixed, 15O(α,γ)19Ne transmission rises from 51 % to 96 %, and the ion optics match GEANT3 from Q1 to MSLT.</p>
+    <p class="lede col">A full-distribution comparison of the GEANT4 port against the GEANT3 DRAGON simulation, for two reactions at the real 2014 hardware tune. It exposed geometry bugs in Ancalagon that destroyed the angle-independent foci at MSLT and FSLT. With them fixed, 15O(α,γ)19Ne transmission rises from 51 % to 96 %, and the first-order ion optics match GEANT3 to within 1 % from Q1 through D2.</p>
     <div class="meta">
       <span><b>Tune</b> dragon_2014_DSSSD, MSLT 0.75 × 1.25 cm</span>
       <span><b>Events</b> 10 000 per code per reaction</span>
-      <span><b>Run</b> 2026-09-25; fixes in Ancalagon main @ 1f28a49</span>
+      <span><b>Run</b> 2026-09-25; fixes in Ancalagon main @ b584b92</span>
     </div>
   </header>
 
   <section class="part">
     <div class="eyebrow">Resolution</div>
-    <h2>Two bugs, found and fixed</h2>
+    <h2>Geometry bugs, found and fixed</h2>
   </section>
 
   <section>
@@ -116,15 +116,19 @@ pre{margin:0;overflow-x:auto;background:var(--surface);border:1px solid var(--ru
     <div class="verdict">
       <div class="v"><span class="chip good"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Fixed</span><h3>Quad field origin</h3><p>Ancalagon placed each quad's field origin at its container centre; the field is defined from the entrance reference plane, as in GEANT3. Every quad sat downstream by half its length plus any drift: 12.6 cm for Q1. Present since the first commit.</p></div>
       <div class="v"><span class="chip good"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Fixed</span><h3>Overlapping fringe fields</h3><p>GEANT3 adds the fields of every overlapping element at a point. Geant4 gives a point to one volume, so where neighbouring quads overlap one fringe was silently dropped. Ancalagon now sums them the same way.</p></div>
-      <div class="v"><span class="chip note"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Open</span><h3>D1 central ray and D2</h3><p>The on-axis ray leaves D1 about 1.6 mrad off GEANT3's, and a smaller residual remains after D2. The Q14 steering and D2 trim were tuned on the old optics and need re-deriving.</p></div>
+      <div class="v"><span class="chip good"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Fixed</span><h3>Dipole fringes cut short</h3><p>D1's and D2's containers stopped short of their own fringe fields, about 14 cm of D1's 30 cm, so the on-axis ray left D1 1.6 mrad off. Each dipole's field now acts over its full reach, including in the gaps.</p></div>
+      <div class="v"><span class="chip good"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Removed</span><h3>Corrections for the old bugs</h3><p>A 2.6 % D2 field trim and a Q14 steering kick had been tuned against the buggy optics. With the bugs fixed both pushed the beam away from GEANT3, so they are off by default.</p></div>
+      <div class="v"><span class="chip note"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Open</span><h3>E2 central ray</h3><p>Ancalagon's E2 bend starts about 6 cm earlier along the path than GEANT3's, which leaves the on-axis ray 5.7 mm apart after E2. Both codes place E2 at the same deck position; GEANT3's e-dipole frame construction is the next suspect.</p></div>
     </div>
-    <div class="tablewrap"><table><thead><tr><th>After both fixes</th><th class="n"><span class="key g3"></span>GEANT3</th><th class="n">Ancalagon before</th><th class="n"><span class="key g4"></span>Ancalagon after</th></tr></thead><tbody>
+    <div class="tablewrap"><table><thead><tr><th>After the fixes</th><th class="n"><span class="key g3"></span>GEANT3</th><th class="n">Ancalagon before</th><th class="n"><span class="key g4"></span>Ancalagon after</th></tr></thead><tbody>
       <tr><td>15O(α,γ)19Ne: recoils on the DSSSD</td><td class="n">82.3 %</td><td class="n">51.2 %</td><td class="n">96.2 %</td></tr>
       <tr><td>15O(α,γ)19Ne: lost at MSLT</td><td class="n">0.9 %</td><td class="n">39.8 %</td><td class="n">0.3 %</td></tr>
       <tr><td>39K(p,γ)40Ca: recoils on the DSSSD</td><td class="n">99.4 %</td><td class="n">99.97 %</td><td class="n">99.99 %</td></tr>
-      <tr><td>(x|θ) at MSLT, matched rays</td><td class="n">+0.007 mm/mrad</td><td class="n">+0.735 mm/mrad</td><td class="n">+0.024 mm/mrad</td></tr>
-      <tr><td>FSLT x rms, 15O(α,γ)19Ne</td><td class="n">0.21 cm</td><td class="n">1.32 cm</td><td class="n">0.28 cm</td></tr>
-      <tr><td>FSLT x rms, 39K(p,γ)40Ca</td><td class="n">0.13 cm</td><td class="n">1.07 cm</td><td class="n">0.11 cm</td></tr>
+      <tr><td>(x|θ) at MSLT, matched rays</td><td class="n">+0.007 mm/mrad</td><td class="n">+0.735 mm/mrad</td><td class="n">+0.006 mm/mrad</td></tr>
+      <tr><td>(x|θ) at FSLT, matched rays</td><td class="n">−0.021 mm/mrad</td><td class="n">+2.592 mm/mrad</td><td class="n">+0.052 mm/mrad</td></tr>
+      <tr><td>FSLT x rms, 15O(α,γ)19Ne</td><td class="n">0.21 cm</td><td class="n">1.32 cm</td><td class="n">0.25 cm</td></tr>
+      <tr><td>FSLT x rms, 39K(p,γ)40Ca</td><td class="n">0.13 cm</td><td class="n">1.07 cm</td><td class="n">0.06 cm</td></tr>
+      <tr><td>Mean angle at the DSSSD, 39K(p,γ)40Ca</td><td class="n">−1.2 mrad</td><td class="n">−11.3 mrad</td><td class="n">−3.3 mrad</td></tr>
     </tbody></table></div>
     <p class="col">The remaining 15O(α,γ)19Ne gap to GEANT3 is GEANT3's own QSLT and target-region losses. GEANT3 includes a finite beam spot and divergence, and Ancalagon fires every recoil from a point. The two reaction sections below record the comparison as found, before the fixes.</p>
   </section>
